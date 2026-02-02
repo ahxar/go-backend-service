@@ -8,12 +8,12 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/safar/go-backend-service/internal/config"
-	"github.com/safar/go-backend-service/internal/handler"
-	"github.com/safar/go-backend-service/internal/repository"
-	"github.com/safar/go-backend-service/internal/server"
-	"github.com/safar/go-backend-service/internal/service"
-	"github.com/safar/go-backend-service/pkg/logger"
+	"github.com/ahxar/go-backend-service/internal/config"
+	"github.com/ahxar/go-backend-service/internal/handler"
+	"github.com/ahxar/go-backend-service/internal/repository"
+	"github.com/ahxar/go-backend-service/internal/server"
+	"github.com/ahxar/go-backend-service/internal/service"
+	"github.com/ahxar/go-backend-service/pkg/logger"
 )
 
 func main() {

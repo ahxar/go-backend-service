@@ -5,14 +5,24 @@ skinparam sequenceMessageAlign center
 actor User
 participant "OS" as OS
 participant "Signal\nHandler" as Signal
+box "cmd/server/main.go" #LightBlue
 participant "Main\nGoroutine" as Main
 participant "Server\nGoroutine" as ServerGo
+end box
+box "internal/server" #LightGreen
 participant "HTTP\nServer" as Server
+end box
 participant "In-Flight\nRequests" as Requests
 
 Main -> Signal: signal.NotifyContext(SIGINT, SIGTERM)
 activate Signal
-Main -> ServerGo: go server.ListenAndServe()
+note right of Main
+  Initialize components:
+  config → logger →
+  repository → service →
+  handler → server
+end note
+Main -> ServerGo: go srv.ListenAndServe()
 activate ServerGo
 ServerGo -> Server: Start listening on :8080
 activate Server
@@ -35,25 +45,30 @@ Signal -> Main: ctx.Done() closes
 deactivate Signal
 activate Main
 
-Main -> Main: logger.Info("shutdown signal received")
-Main -> Main: shutdownCtx = WithTimeout(15s)
-Main -> Server: Shutdown(shutdownCtx)
+Main -> Main: log.Info("shutdown signal received,\nstarting graceful shutdown")
+Main -> Main: shutdownCtx = context.WithTimeout(\ncontext.Background(), cfg.ShutdownTimeout)
+Main -> Server: srv.Shutdown(shutdownCtx)
 
 Server -> Server: Stop accepting new connections
 note right: No new connections accepted
 
 Server -> Requests: Wait for completion
-note right: Server waits for\nin-flight requests\n(up to 15s timeout)
+note right: Server waits for\nin-flight requests\n(up to cfg.ShutdownTimeout,\ndefault: 15s)
 
 Requests -> Requests: Complete processing
 Requests --> Server: All requests complete
 deactivate Requests
 
-Server --> Main: Shutdown complete
+Server --> Main: Shutdown complete (nil or error)
 deactivate Server
 
-Main -> Main: logger.Info("server stopped gracefully")
-Main -> Main: os.Exit(0)
+alt Shutdown successful
+    Main -> Main: log.Info("server stopped gracefully")
+    Main -> Main: os.Exit(0)
+else Shutdown error
+    Main -> Main: log.Error("shutdown error")
+    Main -> Main: os.Exit(1)
+end
 deactivate Main
 deactivate ServerGo
 

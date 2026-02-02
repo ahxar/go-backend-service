@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/safar/go-backend-service/internal/model"
+	"github.com/ahxar/go-backend-service/internal/model"
 )
 
 // ExampleService defines business logic for example operations

@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/safar/go-backend-service/internal/config"
-	"github.com/safar/go-backend-service/internal/handler"
-	"github.com/safar/go-backend-service/internal/middleware"
+	"github.com/ahxar/go-backend-service/internal/config"
+	"github.com/ahxar/go-backend-service/internal/handler"
+	"github.com/ahxar/go-backend-service/internal/middleware"
 )
 
 // New creates and configures the HTTP server

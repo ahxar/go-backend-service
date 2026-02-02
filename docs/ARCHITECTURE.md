@@ -32,37 +32,67 @@ Request context flows through the entire stack, from HTTP handler to service lay
 
 ```
 .
-├── main.go           # Entry point, lifecycle management
-├── config.go         # Configuration loading
-├── logger.go         # Structured logging setup
-├── server.go         # HTTP server and routing
-├── handlers.go       # HTTP request handlers
-├── service.go        # Business logic layer
-├── middleware.go     # HTTP middleware
+├── cmd/
+│   └── server/
+│       └── main.go              # Entry point, lifecycle management
+├── internal/
+│   ├── handler/                 # HTTP handlers (request/response)
+│   │   ├── handler.go           # Handler struct and JSON utilities
+│   │   ├── health.go            # Health check endpoints
+│   │   └── example.go           # Example endpoint
+│   ├── service/                 # Business logic layer
+│   │   ├── service.go           # Service struct and constructor
+│   │   ├── health.go            # Health check logic
+│   │   └── example.go           # Example business logic
+│   ├── repository/              # Data access layer
+│   │   ├── repository.go        # Repository struct and constructor
+│   │   ├── health.go            # Health data operations
+│   │   └── example.go           # Example data operations
+│   ├── middleware/              # HTTP middleware
+│   │   └── middleware.go        # TraceID, Recovery, Logging
+│   ├── server/                  # HTTP server setup
+│   │   └── server.go            # Server configuration and routing
+│   ├── config/                  # Configuration
+│   │   └── config.go            # Environment-based config loading
+│   └── model/                   # Domain models
+│       └── example.go           # Data structures
+├── pkg/
+│   └── logger/                  # Reusable logger package
+│       └── logger.go            # Structured logging setup
 └── docs/
-    ├── README.md
-    └── ARCHITECTURE.md
+    ├── ARCHITECTURE.md
+    ├── graceful-shutdown.puml
+    └── request-lifecycle.puml
 ```
 
-### Why Flat Structure?
+### Why This Structure?
 
-The service uses a flat package structure (no `/cmd`, `/internal`, `/pkg`) because:
-- The service is simple enough that directories add cognitive overhead
-- All code is in a single `main` package
-- Easy to refactor later if the service grows
-- Follows Go's principle of starting simple
+The service uses a clean, layered architecture with clear separation of concerns:
 
-For larger projects, consider:
-```
-/cmd/server/          # Application entry points
-/internal/            # Private application code
-/pkg/                 # Public library code
-```
+**`cmd/server/`** - Application entry point
+- Orchestrates initialization and lifecycle
+- Single responsibility: start and stop the application
+
+**`internal/`** - Private application code
+- Cannot be imported by external packages
+- Ensures encapsulation of implementation details
+- Organized by layer and concern
+
+**`pkg/`** - Reusable library code
+- Can be imported by external packages
+- Contains utilities that could be shared across services
+
+This structure provides:
+- Clear separation between layers (handler → service → repository)
+- Easy navigation (each package has a single responsibility)
+- Testability (each layer can be tested in isolation)
+- Scalability (easy to add new features within the established structure)
 
 ## Component Architecture
 
 ### Configuration Layer
 
+**Package**: `internal/config`
 **File**: `config.go`
 
 Environment-based configuration following 12-factor app principles:
@@ -73,8 +103,21 @@ Environment-based configuration following 12-factor app principles:
 
 **Pattern**: Struct-based config loaded at startup, passed to components.
 
+```go
+type Config struct {
+    Port            string
+    ReadTimeout     time.Duration
+    WriteTimeout    time.Duration
+    IdleTimeout     time.Duration
+    ShutdownTimeout time.Duration
+    LogLevel        string
+    Environment     string
+}
+```
+
 ### Logging Layer
 
+**Package**: `pkg/logger`
 **File**: `logger.go`
 
 Structured logging using `log/slog`:
@@ -85,8 +128,15 @@ Structured logging using `log/slog`:
 
 **Pattern**: Single logger instance created at startup, passed to all components.
 
+```go
+// Usage
+log := logger.New(cfg.Environment, cfg.LogLevel)
+log.InfoContext(ctx, "message", slog.String("key", "value"))
+```
+
 ### HTTP Layer
 
+**Package**: `internal/server`
 **File**: `server.go`
 
 HTTP server configuration and routing:
@@ -97,73 +147,165 @@ HTTP server configuration and routing:
 
 **Pattern**: Factory function returns configured `*http.Server`.
 
+```go
+func New(cfg *config.Config, logger *slog.Logger, h *handler.Handler) *http.Server {
+    mux := http.NewServeMux()
+
+    // Register routes
+    mux.HandleFunc("GET /health", h.Health)
+    mux.HandleFunc("GET /ready", h.Ready)
+    mux.HandleFunc("GET /api/example", h.Example)
+
+    // Apply middleware chain
+    var httpHandler http.Handler = mux
+    httpHandler = middleware.Logging(logger)(httpHandler)
+    httpHandler = middleware.Recovery(logger)(httpHandler)
+    httpHandler = middleware.TraceID(httpHandler)
+
+    return &http.Server{
+        Addr:         fmt.Sprintf(":%s", cfg.Port),
+        Handler:      httpHandler,
+        ReadTimeout:  cfg.ReadTimeout,
+        WriteTimeout: cfg.WriteTimeout,
+        IdleTimeout:  cfg.IdleTimeout,
+    }
+}
+```
+
 ### Handler Layer
 
-**File**: `handlers.go`
+**Package**: `internal/handler`
+**Files**: `handler.go`, `health.go`, `example.go`
 
 HTTP request handlers:
-- Accept dependencies via closure
+- Struct-based handler with dependencies
 - Extract context from request
 - Call service layer with context
 - Handle errors explicitly
 - Return JSON responses
 
-**Pattern**: Higher-order functions return `http.HandlerFunc`.
+**Pattern**: Handler struct holds dependencies, methods implement `http.HandlerFunc`.
 
 ```go
-func ExampleHandler(logger *slog.Logger, svc *Service) http.HandlerFunc {
-    return func(w http.ResponseWriter, r *http.Request) {
-        ctx := r.Context()
-        // Handler logic
+type Handler struct {
+    logger  *slog.Logger
+    service *service.Service
+}
+
+func (h *Handler) Example(w http.ResponseWriter, r *http.Request) {
+    ctx := r.Context()
+    name := r.URL.Query().Get("name")
+
+    result, err := h.service.GetExample(ctx, name)
+    if err != nil {
+        h.writeJSON(w, http.StatusInternalServerError,
+            map[string]string{"error": "internal server error"})
+        return
     }
+
+    h.writeJSON(w, http.StatusOK, result)
 }
 ```
 
 ### Service Layer
 
-**File**: `service.go`
+**Package**: `internal/service`
+**Files**: `service.go`, `health.go`, `example.go`
 
 Business logic layer:
 - Accept `context.Context` as first parameter
 - Check context cancellation before expensive operations
+- Call repository layer for data access
 - Return explicit errors
 - Use context-aware logging
 
-**Pattern**: Service struct holds dependencies, methods accept context.
+**Pattern**: Service struct holds dependencies (logger, repository), methods accept context.
 
 ```go
-func (s *Service) GetExample(ctx context.Context, name string) (map[string]interface{}, error) {
-    // Check context
+type Service struct {
+    logger *slog.Logger
+    repo   *repository.Repository
+}
+
+func (s *Service) GetExample(ctx context.Context, name string) (*model.ExampleResponse, error) {
+    // Check context cancellation
     select {
     case <-ctx.Done():
         return nil, ctx.Err()
     default:
     }
 
+    s.logger.InfoContext(ctx, "processing example request",
+        slog.String("name", name))
+
+    // Call repository for data
+    data, err := s.repo.GetExampleData(ctx, name)
+    if err != nil {
+        return nil, err
+    }
+
     // Business logic
+    return data, nil
+}
+```
+
+### Repository Layer
+
+**Package**: `internal/repository`
+**Files**: `repository.go`, `health.go`, `example.go`
+
+Data access layer:
+- Handles all data persistence and retrieval
+- In a real app, would contain database queries, API calls, caching
+- Accept `context.Context` for cancellation and timeouts
+- Returns domain models from `internal/model`
+
+**Pattern**: Repository struct holds dependencies (logger, database connections), methods accept context.
+
+```go
+type Repository struct {
+    logger *slog.Logger
+    // In production: db *sql.DB
+}
+
+func (r *Repository) GetExampleData(ctx context.Context, name string) (*model.ExampleResponse, error) {
+    // Database query with context
+    // Currently returns mock data for demonstration
+    return &model.ExampleResponse{
+        Message:   fmt.Sprintf("Hello, %s!", name),
+        Timestamp: time.Now(),
+        Processed: true,
+    }, nil
 }
 ```
 
 ### Middleware Layer
 
+**Package**: `internal/middleware`
 **File**: `middleware.go`
 
 HTTP middleware for cross-cutting concerns:
 
-1. **TraceIDMiddleware**: Generates unique trace ID, adds to context and response
-2. **RecoveryMiddleware**: Catches panics, logs, returns 500
-3. **LoggingMiddleware**: Logs requests with method, path, status, duration, trace ID
+1. **TraceID**: Generates unique trace ID using `crypto/rand`, adds to context and response header
+2. **Recovery**: Catches panics, logs with context, returns 500 with JSON error
+3. **Logging**: Logs requests with method, path, status, duration, trace ID
 
 **Pattern**: Middleware chain using higher-order functions.
 
 ```go
-var handler http.Handler = mux
-handler = LoggingMiddleware(logger)(handler)
-handler = RecoveryMiddleware(logger)(handler)
-handler = TraceIDMiddleware(handler)
+var httpHandler http.Handler = mux
+httpHandler = middleware.Logging(logger)(httpHandler)
+httpHandler = middleware.Recovery(logger)(httpHandler)
+httpHandler = middleware.TraceID(httpHandler)
 ```
 
 **Order matters**: Applied in reverse (TraceID → Recovery → Logging → Handler).
+
+**Key features**:
+- TraceID uses cryptographically random IDs via `crypto/rand`
+- Recovery properly handles error response writing with error checking
+- Logging captures status code using a wrapped `responseWriter`
+- All middleware is context-aware and includes trace IDs in logs
 
 ## Key Patterns
 
@@ -173,27 +315,70 @@ Request context flows through the entire stack:
 
 ```
 HTTP Request
-  → Middleware (adds trace ID to context)
-    → Handler (extracts context)
-      → Service (receives context, checks cancellation)
-        → Returns result or error
-      ← Handler (logs with trace ID from context)
-    ← Response (includes X-Trace-ID header)
+  → TraceID Middleware (generates ID, adds to context & response header)
+    → Recovery Middleware (defers panic recovery with context)
+      → Logging Middleware (captures start time)
+        → Handler (extracts context, query params)
+          → Service (receives context, checks cancellation, business logic)
+            → Repository (receives context, data access)
+            ← Returns data or error
+          ← Service returns result or error
+        ← Handler returns JSON response
+      ← Logging logs with duration, status, trace ID
+    ← Recovery catches any panics
+  ← Response (includes X-Trace-ID header)
 ```
+
+**Key points:**
+- Context flows from `http.Request.Context()` through all layers
+- Trace ID is extracted using `middleware.GetTraceID(ctx)`
+- All logging includes trace ID automatically via `logger.InfoContext(ctx, ...)`
+- Context cancellation propagates from client disconnect through all layers
 
 ### Graceful Shutdown
 
 Shutdown sequence ensures no dropped requests:
 
 ```
-1. Receive SIGINT/SIGTERM signal
-2. Stop accepting new connections
-3. Wait for in-flight requests (up to ShutdownTimeout)
-4. Close server
-5. Exit cleanly
+1. Server starts in goroutine via srv.ListenAndServe()
+2. Main goroutine blocks on <-ctx.Done()
+3. User sends SIGINT (Ctrl+C) or SIGTERM
+4. signal.NotifyContext closes context
+5. Main goroutine unblocks, logs "shutdown signal received"
+6. Create shutdown context with timeout (default: 15s)
+7. Call srv.Shutdown(shutdownCtx)
+8. Server stops accepting new connections
+9. Server waits for in-flight requests to complete
+10. Server closes, main goroutine exits with code 0
 ```
 
-**Implementation**: `signal.NotifyContext()` + `server.Shutdown()`.
+**Implementation**:
+```go
+// Create signal context
+ctx, stop := signal.NotifyContext(context.Background(),
+    os.Interrupt, syscall.SIGTERM)
+defer stop()
+
+// Start server in goroutine
+go func() {
+    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+        log.Error("server error", slog.String("error", err.Error()))
+        os.Exit(1)
+    }
+}()
+
+// Block until signal
+<-ctx.Done()
+
+// Graceful shutdown with timeout
+shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+defer cancel()
+
+if err := srv.Shutdown(shutdownCtx); err != nil {
+    log.Error("shutdown error", slog.String("error", err.Error()))
+    os.Exit(1)
+}
+```
 
 ### Error Handling
 
@@ -205,11 +390,38 @@ Explicit error handling at every layer:
 
 ### Dependency Injection
 
-Dependencies passed via function parameters:
+Dependencies passed via constructor functions:
 - No global state
 - Easy to test with mocks
 - Clear dependency graph
 - Explicit initialization order
+
+**Initialization flow** in `cmd/server/main.go`:
+```go
+// 1. Load configuration
+cfg := config.Load()
+
+// 2. Initialize logger
+log := logger.New(cfg.Environment, cfg.LogLevel)
+
+// 3. Initialize repository (bottom layer)
+repo := repository.New(log)
+
+// 4. Initialize service (middle layer)
+svc := service.New(log, repo)
+
+// 5. Initialize handler (top layer)
+h := handler.New(log, svc)
+
+// 6. Create HTTP server
+srv := server.New(cfg, log, h)
+```
+
+**Benefits:**
+- Clear dependency tree: handler → service → repository
+- Each layer only depends on the layer below
+- Easy to swap implementations for testing
+- Compile-time dependency verification
 
 ## Timeouts
 
@@ -228,22 +440,63 @@ Multiple timeout layers for defense in depth:
 
 ### Adding Database
 
-1. Add driver to `go.mod`
-2. Create connection pool in `main.go`
-3. Pass `*sql.DB` to `Service` constructor
-4. Update `ReadyCheck()` to ping database
-5. Use context for query timeouts
+1. Add driver to `go.mod`:
+   ```bash
+   go get github.com/lib/pq  # PostgreSQL example
+   ```
 
-```go
-type Service struct {
-    logger *slog.Logger
-    db     *sql.DB
-}
+2. Create connection pool in `cmd/server/main.go`:
+   ```go
+   db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+   if err != nil {
+       log.Error("failed to open database", slog.String("error", err.Error()))
+       os.Exit(1)
+   }
+   defer db.Close()
 
-func (s *Service) ReadyCheck(ctx context.Context) error {
-    return s.db.PingContext(ctx)
-}
-```
+   // Set connection pool settings
+   db.SetMaxOpenConns(25)
+   db.SetMaxIdleConns(5)
+   db.SetConnMaxLifetime(5 * time.Minute)
+   ```
+
+3. Pass `*sql.DB` to `Repository` constructor:
+   ```go
+   repo := repository.New(log, db)
+   ```
+
+4. Update `internal/repository/repository.go`:
+   ```go
+   type Repository struct {
+       logger *slog.Logger
+       db     *sql.DB
+   }
+
+   func New(logger *slog.Logger, db *sql.DB) *Repository {
+       return &Repository{
+           logger: logger,
+           db:     db,
+       }
+   }
+   ```
+
+5. Update `internal/repository/health.go` to ping database:
+   ```go
+   func (r *Repository) CheckHealth(ctx context.Context) error {
+       return r.db.PingContext(ctx)
+   }
+   ```
+
+6. Use context for all queries:
+   ```go
+   func (r *Repository) GetUser(ctx context.Context, id string) (*model.User, error) {
+       var user model.User
+       err := r.db.QueryRowContext(ctx,
+           "SELECT id, name, email FROM users WHERE id = $1", id,
+       ).Scan(&user.ID, &user.Name, &user.Email)
+       return &user, err
+   }
+   ```
 
 ### Adding Metrics
 
@@ -255,10 +508,60 @@ func (s *Service) ReadyCheck(ctx context.Context) error {
 
 ### Adding Authentication
 
-1. Create JWT/OAuth verification logic
-2. Add authentication middleware
-3. Extract user from token, add to context
-4. Update handlers to check authenticated user
+1. Add JWT library to `go.mod`:
+   ```bash
+   go get github.com/golang-jwt/jwt/v5
+   ```
+
+2. Create authentication middleware in `internal/middleware/middleware.go`:
+   ```go
+   func Auth(secret string) func(http.Handler) http.Handler {
+       return func(next http.Handler) http.Handler {
+           return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+               // Extract token from Authorization header
+               authHeader := r.Header.Get("Authorization")
+               if authHeader == "" {
+                   http.Error(w, "missing authorization", http.StatusUnauthorized)
+                   return
+               }
+
+               // Verify and parse JWT
+               token, err := jwt.Parse(authHeader, func(token *jwt.Token) (interface{}, error) {
+                   return []byte(secret), nil
+               })
+               if err != nil || !token.Valid {
+                   http.Error(w, "invalid token", http.StatusUnauthorized)
+                   return
+               }
+
+               // Extract claims and add to context
+               claims := token.Claims.(jwt.MapClaims)
+               ctx := context.WithValue(r.Context(), "user_id", claims["sub"])
+               next.ServeHTTP(w, r.WithContext(ctx))
+           })
+       }
+   }
+   ```
+
+3. Apply middleware to protected routes in `internal/server/server.go`:
+   ```go
+   // Public routes
+   mux.HandleFunc("GET /health", h.Health)
+   mux.HandleFunc("POST /auth/login", h.Login)
+
+   // Protected routes
+   protectedMux := http.NewServeMux()
+   protectedMux.HandleFunc("GET /api/example", h.Example)
+   mux.Handle("/api/", middleware.Auth(cfg.JWTSecret)(protectedMux))
+   ```
+
+4. Extract user in handlers:
+   ```go
+   func (h *Handler) Example(w http.ResponseWriter, r *http.Request) {
+       userID := r.Context().Value("user_id").(string)
+       // Use userID in business logic
+   }
+   ```
 
 ### Adding Background Jobs
 
@@ -271,10 +574,11 @@ func (s *Service) ReadyCheck(ctx context.Context) error {
 ### Unit Tests
 
 Test individual components in isolation:
-- `config_test.go`: Config loading with various env vars
-- `handlers_test.go`: Handler logic with `httptest`
-- `service_test.go`: Business logic, context cancellation
-- `middleware_test.go`: Middleware behavior
+- `internal/config/config_test.go`: Config loading with various env vars
+- `internal/handler/handler_test.go`: Handler logic with `httptest`
+- `internal/service/service_test.go`: Business logic, context cancellation
+- `internal/middleware/middleware_test.go`: Middleware behavior
+- `internal/repository/repository_test.go`: Data access with mocked database
 
 ### Integration Tests
 
@@ -287,17 +591,52 @@ Test complete request flow:
 ### Test Patterns
 
 ```go
-// Handler testing
-req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
-rec := httptest.NewRecorder()
-handler.ServeHTTP(rec, req)
-assert.Equal(t, http.StatusOK, rec.Code)
+// Handler testing with dependencies
+func TestHandler_Health(t *testing.T) {
+    logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+    repo := repository.New(logger)
+    svc := service.New(logger, repo)
+    h := handler.New(logger, svc)
 
-// Context cancellation
-ctx, cancel := context.WithCancel(context.Background())
-cancel()
-_, err := svc.DoSomething(ctx)
-assert.Equal(t, context.Canceled, err)
+    req := httptest.NewRequest(http.MethodGet, "/health", nil)
+    rec := httptest.NewRecorder()
+
+    h.Health(rec, req)
+
+    assert.Equal(t, http.StatusOK, rec.Code)
+    assert.Contains(t, rec.Body.String(), `"status":"healthy"`)
+}
+
+// Service testing with context cancellation
+func TestService_GetExample_ContextCanceled(t *testing.T) {
+    logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+    repo := repository.New(logger)
+    svc := service.New(logger, repo)
+
+    ctx, cancel := context.WithCancel(context.Background())
+    cancel()
+
+    _, err := svc.GetExample(ctx, "test")
+    assert.Equal(t, context.Canceled, err)
+}
+
+// Middleware testing
+func TestMiddleware_TraceID(t *testing.T) {
+    handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        traceID := middleware.GetTraceID(r.Context())
+        assert.NotEmpty(t, traceID)
+        w.WriteHeader(http.StatusOK)
+    })
+
+    wrapped := middleware.TraceID(handler)
+    req := httptest.NewRequest(http.MethodGet, "/", nil)
+    rec := httptest.NewRecorder()
+
+    wrapped.ServeHTTP(rec, req)
+
+    assert.Equal(t, http.StatusOK, rec.Code)
+    assert.NotEmpty(t, rec.Header().Get("X-Trace-ID"))
+}
 ```
 
 ## Performance Considerations
@@ -371,18 +710,21 @@ Use cryptographically random trace IDs via `crypto/rand`, not predictable sequen
 
 **Decision**: Simplicity and stability outweigh convenience for this service size.
 
-### Flat Package Structure
+### Layered Package Structure
 
 **Pros**:
-- Simpler navigation
-- Less cognitive overhead
-- Easy to refactor later
+- Clear separation of concerns (handler → service → repository)
+- Each package has single responsibility
+- Easy to test layers in isolation
+- Enforces proper dependencies (layers only depend on lower layers)
+- Scales well as service grows
 
 **Cons**:
-- All code in `main` package
-- Can't import between packages
+- More directories to navigate
+- Slightly more boilerplate for small services
+- Need to understand layer boundaries
 
-**Decision**: Appropriate for service of this size, refactor if it grows.
+**Decision**: The structure provides clear organization and scales well as features are added. The benefits of separation outweigh the minimal overhead for a service of this size.
 
 ### Environment-Based Config
 
@@ -399,16 +741,45 @@ Use cryptographically random trace IDs via `crypto/rand`, not predictable sequen
 
 ## Future Considerations
 
-As the service grows, consider:
+The service already has a solid foundation. As it grows, consider:
 
-1. **Package structure**: Move to `/cmd`, `/internal`, `/pkg`
-2. **Wire dependency injection**: Generate DI code
-3. **OpenAPI spec**: Document API with OpenAPI 3.0
+1. ✅ **Package structure**: Already using `/cmd`, `/internal`, `/pkg`
+2. **Wire dependency injection**: Generate DI code for complex dependency graphs
+3. **OpenAPI spec**: Document API with OpenAPI 3.0 / Swagger
 4. **Prometheus metrics**: Track request rates, errors, latency
+   ```go
+   // Add metrics middleware
+   httpHandler = middleware.Metrics()(httpHandler)
+   mux.Handle("/metrics", promhttp.Handler())
+   ```
 5. **Distributed tracing**: Add OpenTelemetry support
-6. **Database**: Add connection pooling and migrations
+   ```go
+   // Initialize tracer
+   tp := trace.NewTracerProvider(...)
+   otel.SetTracerProvider(tp)
+
+   // Add tracing middleware
+   httpHandler = otelhttp.NewHandler(httpHandler, "server")
+   ```
+6. **Database**: Add connection pooling and migrations (see "Adding Database" above)
 7. **Caching**: Add Redis for performance
+   ```go
+   // Initialize Redis client
+   rdb := redis.NewClient(&redis.Options{...})
+
+   // Pass to repository
+   repo := repository.New(log, db, rdb)
+   ```
 8. **Rate limiting**: Protect against abuse
+   ```go
+   // Add rate limiting middleware
+   httpHandler = middleware.RateLimit(100)(httpHandler)
+   ```
+9. **API Versioning**: Add version prefixes to routes
+   ```go
+   mux.HandleFunc("GET /api/v1/example", h.Example)
+   mux.HandleFunc("GET /api/v2/example", h.ExampleV2)
+   ```
 
 ## References
 

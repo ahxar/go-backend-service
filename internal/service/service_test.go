@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/safar/go-backend-service/internal/repository"
+	"github.com/ahxar/go-backend-service/internal/repository"
 )
 
 func setupTestService() *Service {

@@ -3,7 +3,7 @@ package service
 import (
 	"log/slog"
 
-	"github.com/safar/go-backend-service/internal/repository"
+	"github.com/ahxar/go-backend-service/internal/repository"
 )
 
 // Service contains business logic and dependencies

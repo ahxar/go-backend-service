@@ -43,7 +43,7 @@ lint: ## Run linters
 fmt: ## Format code
 	@echo "Formatting code..."
 	@go fmt ./...
-	@goimports -w -local github.com/safar/go-backend-service .
+	@goimports -w -local github.com/ahxar/go-backend-service .
 
 vet: ## Run go vet
 	@echo "Running go vet..."

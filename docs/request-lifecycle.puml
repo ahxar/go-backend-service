@@ -5,11 +5,20 @@ skinparam responseMessageBelowArrow true
 
 actor Client
 participant "HTTP Server" as Server
+box "internal/middleware" #LightBlue
 participant "TraceID\nMiddleware" as TraceID
 participant "Recovery\nMiddleware" as Recovery
 participant "Logging\nMiddleware" as Logging
+end box
+box "internal/handler" #LightGreen
 participant "Handler" as Handler
+end box
+box "internal/service" #LightYellow
 participant "Service" as Service
+end box
+box "internal/repository" #LightPink
+participant "Repository" as Repository
+end box
 database "Context" as Context
 
 Client -> Server: GET /api/example?name=Go
@@ -43,9 +52,15 @@ note right
   from context
 end note
 
-Service -> Service: time.Sleep(100ms)
-Service -> Service: select { case <-ctx.Done() }
-Service -> Service: result = map[string]any{...}
+Service -> Repository: GetExampleData(ctx, name)
+activate Repository
+Repository -> Repository: select { case <-ctx.Done() }
+Repository -> Context: logger.InfoContext(ctx, "fetching data")
+Repository -> Repository: Build response data
+Repository --> Service: model.ExampleResponse, nil
+deactivate Repository
+
+Service -> Service: Apply business logic
 Service --> Handler: result, nil
 deactivate Service
 

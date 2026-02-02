@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/safar/go-backend-service/internal/service"
+	"github.com/ahxar/go-backend-service/internal/service"
 )
 
 // Handler contains HTTP handlers and dependencies

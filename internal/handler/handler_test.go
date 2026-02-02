@@ -8,9 +8,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/safar/go-backend-service/internal/model"
-	"github.com/safar/go-backend-service/internal/repository"
-	"github.com/safar/go-backend-service/internal/service"
+	"github.com/ahxar/go-backend-service/internal/model"
+	"github.com/ahxar/go-backend-service/internal/repository"
+	"github.com/ahxar/go-backend-service/internal/service"
 )
 
 func setupTestHandler() *Handler {
