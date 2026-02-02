@@ -1,121 +1,92 @@
-# Production-Ready Go HTTP Service
+# Go HTTP Service
 
-A production-ready Go HTTP service built with clean 3-layer architecture using only the Go standard library. Designed to scale with proper separation of concerns, comprehensive testing, and CI/CD automation.
+> A production-ready HTTP service template built with Go's standard library. Clean architecture, zero dependencies, and ready to scale.
 
-## Features
-
-- **3-Layer Architecture** - Clean separation: Handler → Service → Repository
-- **Zero External Dependencies** - Built entirely with Go 1.21+ standard library
-- **Scalable Structure** - Organized for growth with `/cmd`, `/internal`, `/pkg`
-- **Graceful Shutdown** - Handles SIGINT/SIGTERM signals and drains in-flight requests
-- **Structured Logging** - JSON logging in production using `log/slog`
-- **Request Tracing** - Unique trace ID per request for distributed tracing
-- **Context Propagation** - Request context flows through entire stack
-- **Explicit Timeouts** - Configured at server and request levels
-- **Health & Readiness** - Health check endpoints
-- **12-Factor Config** - Environment-based configuration
-- **CI/CD Ready** - GitHub Actions for testing, linting, and building
-
-## Project Structure
-
-```
-/Users/safar/Projects/go-backend-service/
-├── cmd/
-│   └── server/
-│       └── main.go              # Application entry point
-├── internal/
-│   ├── config/
-│   │   ├── config.go            # Configuration loading
-│   │   └── config_test.go
-│   ├── handler/                 # HTTP layer
-│   │   ├── handler.go           # Handler infrastructure
-│   │   ├── health.go            # Health check handlers
-│   │   ├── example.go           # Example API handlers
-│   │   └── handler_test.go
-│   ├── service/                 # Business logic layer
-│   │   ├── service.go           # Service infrastructure
-│   │   ├── health.go            # Health check logic
-│   │   ├── example.go           # Example business logic
-│   │   └── service_test.go
-│   ├── repository/              # Data access layer
-│   │   ├── repository.go        # Repository infrastructure
-│   │   ├── health.go            # Health check data access
-│   │   └── example.go           # Example data access
-│   ├── middleware/
-│   │   └── middleware.go        # HTTP middleware
-│   ├── model/
-│   │   └── example.go           # Domain models
-│   └── server/
-│       └── server.go            # HTTP server setup
-├── pkg/
-│   └── logger/
-│       └── logger.go            # Reusable logger package
-├── .github/
-│   └── workflows/
-│       └── ci.yml               # CI pipeline
-├── docs/                        # Documentation
-├── Makefile                     # Build automation
-├── .golangci.yml               # Linter configuration
-├── .gitignore
-├── .env.example
-├── go.mod
-└── README.md
-```
-
-## Architecture Layers
-
-### Handler Layer (`internal/handler/`)
-
-- HTTP request/response handling
-- Request validation
-- Response formatting
-- Calls service layer
-
-### Service Layer (`internal/service/`)
-
-- Business logic
-- Transaction management
-- Orchestrates repository calls
-- Context-aware operations
-
-### Repository Layer (`internal/repository/`)
-
-- Data access
-- Database queries
-- External service calls
-- Cache operations
-
-## Quick Start
-
-### Prerequisites
-
-- Go 1.21 or higher
-- Make (optional, for Makefile commands)
-
-### Running Locally
+## 🚀 Quick Start
 
 ```bash
-# Using go run
+# Run the service
 go run ./cmd/server
 
-# Using make
+# The server starts on http://localhost:8080
+# Try it: curl http://localhost:8080/health
+```
+
+That's it! The service is running with:
+- ✅ Health check endpoint
+- ✅ Request tracing
+- ✅ Structured logging
+- ✅ Graceful shutdown
+
+## 📦 What You Get
+
+This template provides a solid foundation for building HTTP services in Go:
+
+- **Clean Architecture** - 3-layer separation (Handler → Service → Repository)
+- **No Dependencies** - Uses only Go 1.21+ standard library
+- **Production Ready** - Includes logging, tracing, health checks, and graceful shutdown
+- **Well Tested** - Comprehensive test coverage with examples
+- **CI/CD** - GitHub Actions workflow for testing and linting
+- **Scalable Structure** - Organized to grow from small to large projects
+
+## 📖 Table of Contents
+
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Endpoints](#api-endpoints)
+- [Configuration](#configuration)
+- [Development](#development)
+- [Architecture](#architecture)
+- [Extending](#extending)
+
+## 💻 Installation
+
+**Prerequisites:**
+- Go 1.21 or higher
+- Make (optional, but recommended)
+
+**Get started:**
+
+```bash
+# Clone or download this repository
+cd go-backend-service
+
+# Run the service
+make run
+# or
+go run ./cmd/server
+```
+
+## 🎯 Usage
+
+### Running the Service
+
+```bash
+# Development mode
 make run
 
-# With custom configuration
-PORT=9000 LOG_LEVEL=debug go run ./cmd/server
+# With custom port
+PORT=9000 make run
+
+# With debug logging
+LOG_LEVEL=debug make run
+
+# Production mode
+ENVIRONMENT=production LOG_LEVEL=info make run
 ```
 
 ### Building
 
 ```bash
-# Build for current platform
+# Build for your platform
 make build
+# Creates: ./bin/server
 
-# Build for all platforms
+# Build for all platforms (Linux, macOS, Windows)
 make build-all
 
-# Using go directly
-go build -o server ./cmd/server
+# Run the binary
+./bin/server
 ```
 
 ### Testing
@@ -124,153 +95,219 @@ go build -o server ./cmd/server
 # Run all tests
 make test
 
-# Run tests with coverage
+# Run tests with coverage report
 make test-coverage
 
 # Run linter
 make lint
 
-# Run all checks
+# Run everything (lint + vet + test)
 make check
 ```
 
-## API Endpoints
+## 🌐 API Endpoints
 
 ### Health Check
+Check if the service is alive.
 
 ```bash
 curl http://localhost:8080/health
-# {"status":"healthy"}
+```
+
+**Response:**
+```json
+{"status":"healthy"}
 ```
 
 ### Readiness Check
+Check if the service is ready to handle traffic.
 
 ```bash
 curl http://localhost:8080/ready
-# {"status":"ready"}
+```
+
+**Response:**
+```json
+{"status":"ready"}
 ```
 
 ### Example Endpoint
+A sample endpoint demonstrating the full request lifecycle.
 
 ```bash
 curl http://localhost:8080/api/example?name=World
-# {"message":"Hello, World!","timestamp":"2026-02-02T12:34:56Z","processed":true}
 ```
 
-Every response includes an `X-Trace-ID` header for request correlation.
-
-## Configuration
-
-All configuration via environment variables:
-
-| Variable           | Default       | Description                              |
-| ------------------ | ------------- | ---------------------------------------- |
-| `PORT`             | `8080`        | HTTP server port                         |
-| `READ_TIMEOUT`     | `5s`          | Request read timeout                     |
-| `WRITE_TIMEOUT`    | `10s`         | Response write timeout                   |
-| `IDLE_TIMEOUT`     | `120s`        | Keep-alive idle timeout                  |
-| `SHUTDOWN_TIMEOUT` | `15s`         | Graceful shutdown timeout                |
-| `LOG_LEVEL`        | `info`        | Logging level (debug, info, warn, error) |
-| `ENVIRONMENT`      | `development` | Environment (development, production)    |
-
-See `.env.example` for a complete configuration template.
-
-## CI/CD Pipeline
-
-### Continuous Integration (`.github/workflows/ci.yml`)
-
-Runs on push and pull requests:
-
-- **Test**: Run tests with race detection and coverage
-- **Lint**: golangci-lint with comprehensive checks
-- **Build**: Verify binary builds successfully
-- **Security**: Gosec security scanner
-
-## Adding New Features
-
-### Add a New Endpoint
-
-1. **Define Model** (`internal/model/`)
-
-```go
-type UserRequest struct {
-    Name string `json:"name"`
+**Response:**
+```json
+{
+  "message": "Hello, World!",
+  "timestamp": "2026-02-02T12:34:56Z",
+  "processed": true
 }
+```
 
-type UserResponse struct {
+**Note:** Every response includes an `X-Trace-ID` header for request correlation across logs.
+
+## ⚙️ Configuration
+
+Configure the service using environment variables:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | HTTP server port |
+| `LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
+| `ENVIRONMENT` | `development` | Environment: development, production |
+| `READ_TIMEOUT` | `5s` | Maximum time to read requests |
+| `WRITE_TIMEOUT` | `10s` | Maximum time to write responses |
+| `IDLE_TIMEOUT` | `120s` | Keep-alive timeout |
+| `SHUTDOWN_TIMEOUT` | `15s` | Graceful shutdown timeout |
+
+**Example:**
+```bash
+# Create a .env file (optional)
+cp .env.example .env
+
+# Edit values, then run
+export $(cat .env | xargs) && go run ./cmd/server
+```
+
+## 🛠️ Development
+
+### Project Structure
+
+```
+cmd/server/           # Application entry point
+internal/
+  ├── handler/        # HTTP handlers (request/response)
+  ├── service/        # Business logic
+  ├── repository/     # Data access (databases, APIs)
+  ├── middleware/     # HTTP middleware
+  ├── model/          # Data models
+  ├── config/         # Configuration
+  └── server/         # Server setup
+pkg/logger/           # Reusable logger
+```
+
+### Development Tools
+
+Install recommended tools for development:
+
+```bash
+make install-tools
+```
+
+This installs:
+- **golangci-lint** - Fast Go linters runner
+- **goimports** - Automatic import formatting
+- **air** - Live reload for development
+
+### Available Commands
+
+```bash
+make help              # Show all available commands
+make build             # Build the application
+make test              # Run tests with coverage
+make lint              # Run linters
+make fmt               # Format code
+make run               # Run the application
+make clean             # Clean build artifacts
+make check             # Run all checks
+make ci                # Run CI pipeline locally
+```
+
+## 🏗️ Architecture
+
+This service follows a **3-layer architecture** for clean separation of concerns:
+
+### 1. Handler Layer (`internal/handler/`)
+Handles HTTP requests and responses.
+
+**Responsibilities:**
+- Parse and validate requests
+- Format responses
+- Handle HTTP-specific concerns
+- Call the service layer
+
+### 2. Service Layer (`internal/service/`)
+Contains business logic.
+
+**Responsibilities:**
+- Implement business rules
+- Orchestrate operations
+- Call the repository layer
+- Return results or errors
+
+### 3. Repository Layer (`internal/repository/`)
+Manages data access.
+
+**Responsibilities:**
+- Database queries
+- External API calls
+- Cache operations
+- Data persistence
+
+**Request Flow:**
+```
+HTTP Request → Handler → Service → Repository → Database
+HTTP Response ← Handler ← Service ← Repository ← Database
+```
+
+[See detailed architecture documentation →](docs/ARCHITECTURE.md)
+
+## 🔧 Extending
+
+### Adding a New Endpoint
+
+Follow these steps to add a new API endpoint:
+
+**1. Define your model** in `internal/model/`:
+```go
+type User struct {
     ID   string `json:"id"`
     Name string `json:"name"`
 }
 ```
 
-2. **Add Repository Method** (`internal/repository/user.go`)
-
+**2. Add repository method** in `internal/repository/`:
 ```go
-func (r *Repository) CreateUser(ctx context.Context, name string) (*model.UserResponse, error) {
+func (r *Repository) CreateUser(ctx context.Context, name string) (*model.User, error) {
     // Database logic here
-    return &model.UserResponse{ID: "1", Name: name}, nil
+    return &model.User{ID: "1", Name: name}, nil
 }
 ```
 
-3. **Add Service Method** (`internal/service/user.go`)
-
+**3. Add service method** in `internal/service/`:
 ```go
-func (s *Service) CreateUser(ctx context.Context, req *model.UserRequest) (*model.UserResponse, error) {
+func (s *Service) CreateUser(ctx context.Context, name string) (*model.User, error) {
     // Business logic here
-    return s.repo.CreateUser(ctx, req.Name)
+    return s.repo.CreateUser(ctx, name)
 }
 ```
 
-4. **Add Handler** (`internal/handler/user.go`)
-
+**4. Add handler** in `internal/handler/`:
 ```go
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
-    ctx := r.Context()
-    var req model.UserRequest
-
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        h.writeJSON(w, http.StatusBadRequest, &model.ErrorResponse{Error: "invalid request"})
-        return
-    }
-
-    result, err := h.service.CreateUser(ctx, &req)
-    if err != nil {
-        h.writeJSON(w, http.StatusInternalServerError, &model.ErrorResponse{Error: err.Error()})
-        return
-    }
-
-    h.writeJSON(w, http.StatusCreated, result)
+    // Parse request, call service, return response
 }
 ```
 
-5. **Register Route** (`internal/server/server.go`)
-
+**5. Register route** in `internal/server/server.go`:
 ```go
 mux.HandleFunc("POST /api/users", h.CreateUser)
 ```
 
-### Add Database Connection
+### Adding a Database
 
-1. **Update Repository** (`internal/repository/repository.go`)
-
+**1. Update repository** to accept database connection:
 ```go
-import "database/sql"
-
 type Repository struct {
     logger *slog.Logger
     db     *sql.DB
 }
-
-func New(logger *slog.Logger, db *sql.DB) *Repository {
-    return &Repository{
-        logger: logger,
-        db:     db,
-    }
-}
 ```
 
-2. **Initialize in main** (`cmd/server/main.go`)
-
+**2. Initialize in main** (`cmd/server/main.go`):
 ```go
 db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 if err != nil {
@@ -281,135 +318,108 @@ defer db.Close()
 repo := repository.New(log, db)
 ```
 
-## Makefile Commands
+### Growing Your Service
 
-```bash
-make help              # Show all commands
-make build             # Build binary
-make build-all         # Build for all platforms
-make test              # Run tests
-make test-coverage     # Generate coverage report
-make lint              # Run linters
-make fmt               # Format code
-make clean             # Clean build artifacts
-make run               # Run application
-make check             # Run all checks (lint + vet + test)
-make ci                # Run full CI pipeline locally
-```
+As your service grows, organize code by domain:
 
-## Development Tools
+**Small service** (< 10 endpoints):
+- Keep each layer in one file per domain
 
-Install recommended tools:
+**Medium service** (10-50 endpoints):
+- Split handlers into separate files
+- Keep service and repository combined
 
-```bash
-make install-tools
-```
+**Large service** (> 50 endpoints):
+- Create subdirectories per domain
+- Split all layers by feature
 
-This installs:
-
-- golangci-lint (linting)
-- goimports (import formatting)
-- air (hot reload for development)
-
-## Testing Strategy
-
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test layer interactions
-- **Coverage**: Target >70% code coverage
-- **Race Detection**: All tests run with `-race` flag
-- **Mocking**: Use interfaces for dependency injection
-
-## Best Practices
-
-### Organizing Large Services
-
-As your service grows, organize each layer by domain:
-
+Example structure for large services:
 ```
 internal/
-├── handler/
-│   ├── user/           # User-related handlers
-│   │   ├── create.go
-│   │   ├── get.go
-│   │   ├── update.go
-│   │   └── delete.go
-│   └── product/        # Product-related handlers
-│       ├── create.go
-│       └── list.go
-├── service/
-│   ├── user/           # User business logic
-│   └── product/        # Product business logic
-└── repository/
-    ├── user/           # User data access
-    └── product/        # Product data access
+  ├── handler/
+  │   ├── user/
+  │   │   ├── create.go
+  │   │   ├── get.go
+  │   │   └── update.go
+  │   └── product/
+  └── service/
+      ├── user/
+      └── product/
 ```
 
-### Context Usage
+## 🧪 Testing
 
-Always pass context as the first parameter:
+The service includes comprehensive tests:
 
-```go
-func (s *Service) ProcessData(ctx context.Context, data string) error {
-    // Check context before expensive operations
-    select {
-    case <-ctx.Done():
-        return ctx.Err()
-    default:
-    }
+```bash
+# Run all tests
+make test
 
-    // Your logic here
-}
+# Run tests with race detection
+go test -race ./...
+
+# Generate coverage report
+make test-coverage
+open coverage.html
 ```
 
-### Error Handling
+**Testing strategy:**
+- **Unit tests** - Test individual components
+- **Integration tests** - Test layer interactions
+- **Table-driven tests** - Test multiple scenarios
+- **Coverage target** - Aim for >70%
 
-Return wrapped errors for better debugging:
+## 🔒 Security
 
-```go
-if err := s.repo.Save(ctx, data); err != nil {
-    return fmt.Errorf("failed to save data: %w", err)
-}
-```
+The service includes security best practices:
 
-## Performance Considerations
+- ✅ No hardcoded credentials
+- ✅ Environment-based configuration
+- ✅ Request timeouts prevent resource exhaustion
+- ✅ Panic recovery middleware
+- ✅ Input validation at handler layer
+- ✅ Structured logging (no sensitive data)
 
-- Connection pooling at repository layer
-- Request timeouts prevent resource exhaustion
-- Context cancellation stops work early
-- Structured logging with appropriate levels
-- Efficient JSON encoding/decoding
+## 🚦 CI/CD
 
-## Security
+The project includes a GitHub Actions workflow for:
 
-- No hardcoded credentials
-- Environment-based configuration
-- Timeouts on all operations
-- Panic recovery middleware
-- Input validation at handler layer
+- **Testing** - Run tests with race detection
+- **Linting** - Check code quality with golangci-lint
+- **Building** - Verify the service builds
+- **Security** - Scan for vulnerabilities with Gosec
 
-## Documentation
+See `.github/workflows/ci.yml` for details.
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed architecture decisions
-- [Request Lifecycle](docs/request-lifecycle.puml) - Request flow diagram
-- [Graceful Shutdown](docs/graceful-shutdown.puml) - Shutdown sequence
+## 📚 Additional Documentation
 
-## Contributing
+- [Architecture Details](docs/ARCHITECTURE.md) - In-depth architecture decisions
+- [Request Lifecycle](docs/request-lifecycle.puml) - Visual request flow diagram
+- [Graceful Shutdown](docs/graceful-shutdown.puml) - Shutdown sequence diagram
+
+## 🤝 Contributing
+
+Contributions are welcome! Here's how:
 
 1. Fork the repository
-2. Create a feature branch
+2. Create a feature branch (`git checkout -b feature/amazing`)
 3. Make your changes
-4. Run tests: `make check`
-5. Submit a pull request
+4. Run tests (`make check`)
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing`)
+7. Open a Pull Request
 
-## License
+## 📝 License
 
 MIT
 
-## Project Status
+---
 
-✅ Production-ready 3-layer architecture
-✅ Comprehensive test coverage
-✅ CI/CD automation with GitHub Actions
-✅ Health check endpoints
-✅ Zero external dependencies
-✅ Extensive documentation
+**Built with ❤️ using Go's standard library**
+
+### Project Status
+
+✅ Production-ready
+✅ Well-tested
+✅ Zero dependencies
+✅ Actively maintained
