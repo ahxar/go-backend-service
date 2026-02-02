@@ -14,8 +14,9 @@ go run ./cmd/server
 
 That's it! The service is running with:
 - ✅ Health check endpoint
-- ✅ Request tracing
-- ✅ Structured logging
+- ✅ OpenTelemetry distributed tracing
+- ✅ Structured logging with trace correlation
+- ✅ Swagger/OpenAPI documentation
 - ✅ Graceful shutdown
 
 ## 📦 What You Get
@@ -23,8 +24,8 @@ That's it! The service is running with:
 This template provides a solid foundation for building HTTP services in Go:
 
 - **Clean Architecture** - 3-layer separation (Handler → Service → Repository)
-- **No Dependencies** - Uses only Go 1.21+ standard library
-- **Production Ready** - Includes logging, tracing, health checks, and graceful shutdown
+- **Minimal Dependencies** - Built on Go 1.21+ standard library with OpenTelemetry
+- **Production Ready** - OpenTelemetry tracing/metrics, Swagger docs, health checks, graceful shutdown
 - **Well Tested** - Comprehensive test coverage with examples
 - **CI/CD** - GitHub Actions workflow for testing and linting
 - **Scalable Structure** - Organized to grow from small to large projects
@@ -105,6 +106,47 @@ make lint
 make check
 ```
 
+## 🔥 Key Features
+
+### OpenTelemetry Observability
+
+Full distributed tracing and metrics powered by OpenTelemetry:
+- **W3C Trace Context**: Standard trace propagation across services
+- **Automatic Instrumentation**: HTTP requests automatically traced
+- **OTLP Export**: Traces and metrics exported to any OTLP-compatible backend (Jaeger, Tempo, etc.)
+- **Trace ID in Logs**: Every log entry includes the OpenTelemetry trace ID
+- **Configurable**: Enable/disable via environment variables
+
+```bash
+# Configure OpenTelemetry
+OTEL_ENABLED=true
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTEL_SERVICE_NAME=go-backend-service
+```
+
+### Swagger/OpenAPI Documentation
+
+Interactive API documentation automatically generated from code annotations:
+- **Swagger UI**: Available at `http://localhost:8080/swagger/`
+- **OpenAPI 3.0**: Standard API specification
+- **Auto-generated**: Regenerated on every build/run
+- **Type-safe**: Swagger annotations validated at compile time
+
+Generate docs manually:
+```bash
+make swagger-gen
+```
+
+### Generic Configuration
+
+Type-safe configuration loading with a single generic function:
+```go
+// Supports string, bool, time.Duration automatically
+Port:        getEnv("PORT", "8080")
+OtelEnabled: getEnv("OTEL_ENABLED", true)
+ReadTimeout: getEnv("READ_TIMEOUT", 5*time.Second)
+```
+
 ## 🌐 API Endpoints
 
 ### Health Check
@@ -147,7 +189,21 @@ curl http://localhost:8080/api/example?name=World
 }
 ```
 
-**Note:** Every response includes an `X-Trace-ID` header for request correlation across logs.
+**Note:** Every response includes an `X-Trace-ID` header containing the OpenTelemetry trace ID for distributed tracing and request correlation across logs.
+
+### Swagger Documentation
+Interactive API documentation with try-it-out functionality.
+
+```bash
+# Open in browser
+open http://localhost:8080/swagger/
+```
+
+**Features:**
+- Try API endpoints directly from the browser
+- View request/response schemas
+- See all available parameters
+- Download OpenAPI specification
 
 ## ⚙️ Configuration
 
@@ -162,6 +218,10 @@ Configure the service using environment variables:
 | `WRITE_TIMEOUT` | `10s` | Maximum time to write responses |
 | `IDLE_TIMEOUT` | `120s` | Keep-alive timeout |
 | `SHUTDOWN_TIMEOUT` | `15s` | Graceful shutdown timeout |
+| `OTEL_ENABLED` | `true` | Enable OpenTelemetry tracing/metrics |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP endpoint for traces/metrics |
+| `OTEL_SERVICE_NAME` | `go-backend-service` | Service name for OpenTelemetry |
+| `OTEL_SERVICE_VERSION` | `1.0.0` | Service version for OpenTelemetry |
 
 **Example:**
 ```bash
@@ -214,6 +274,8 @@ make run               # Run the application
 make clean             # Clean build artifacts
 make check             # Run all checks
 make ci                # Run CI pipeline locally
+make swagger-gen       # Generate Swagger documentation
+make swagger-fmt       # Format Swagger comments
 ```
 
 ## 🏗️ Architecture

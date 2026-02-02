@@ -6,7 +6,7 @@ skinparam responseMessageBelowArrow true
 actor Client
 participant "HTTP Server" as Server
 box "internal/middleware" #LightBlue
-participant "TraceID\nMiddleware" as TraceID
+participant "Tracing\nMiddleware\n(OpenTelemetry)" as Tracing
 participant "Recovery\nMiddleware" as Recovery
 participant "Logging\nMiddleware" as Logging
 end box
@@ -24,13 +24,19 @@ database "Context" as Context
 Client -> Server: GET /api/example?name=Go
 activate Server
 
-Server -> TraceID: ServeHTTP(w, r)
-activate TraceID
-TraceID -> TraceID: generateTraceID()
-TraceID -> Context: ctx = WithValue(r.Context(), traceID)
-TraceID -> TraceID: w.Header.Set("X-Trace-ID", traceID)
+Server -> Tracing: ServeHTTP(w, r)
+activate Tracing
+Tracing -> Tracing: propagator.Extract(r.Context(), headers)
+Tracing -> Tracing: tracer.Start(ctx, spanName)
+note right
+  Creates OpenTelemetry span
+  Extracts W3C Trace Context
+  Generates trace ID if new
+end note
+Tracing -> Context: ctx with span
+Tracing -> Tracing: w.Header.Set("X-Trace-ID", span.TraceID())
 
-TraceID -> Recovery: ServeHTTP(w, r.WithContext(ctx))
+Tracing -> Recovery: ServeHTTP(w, r.WithContext(ctx))
 activate Recovery
 Recovery -> Recovery: defer recover()
 
@@ -72,21 +78,28 @@ Logging -> Logging: duration := time.Since(start)
 Logging -> Context: logger.InfoContext(ctx, "http request", ...)
 note right
   Logs: method, path, status,
-  duration, trace_id
+  duration, OpenTelemetry trace_id
 end note
 Logging --> Recovery: return
 deactivate Logging
 
-Recovery --> TraceID: return
+Recovery --> Tracing: return
 deactivate Recovery
 
-TraceID --> Server: return
-deactivate TraceID
+Tracing -> Tracing: span.SetAttributes(status_code)
+Tracing -> Tracing: span.End()
+note right
+  Records span completion
+  Exports to OTLP endpoint
+end note
+Tracing --> Server: return
+deactivate Tracing
 
 Server --> Client: 200 OK + JSON body
 note left
   Headers:
-  X-Trace-ID: abc123...
+  X-Trace-ID: 0123456789abcdef0123456789abcdef
+  (W3C Trace Context format - 32 hex chars)
   Content-Type: application/json
 end note
 deactivate Server

@@ -57,8 +57,10 @@ Request context flows through the entire stack, from HTTP handler to service lay
 │   └── model/                   # Domain models
 │       └── example.go           # Data structures
 ├── pkg/
-│   └── logger/                  # Reusable logger package
-│       └── logger.go            # Structured logging setup
+│   ├── logger/                  # Reusable logger package
+│   │   └── logger.go            # Structured logging setup
+│   └── otel/                    # OpenTelemetry setup
+│       └── otel.go              # Tracing and metrics initialization
 └── docs/
     ├── ARCHITECTURE.md
     ├── graceful-shutdown.puml
@@ -105,14 +107,24 @@ Environment-based configuration following 12-factor app principles:
 
 ```go
 type Config struct {
-    Port            string
-    ReadTimeout     time.Duration
-    WriteTimeout    time.Duration
-    IdleTimeout     time.Duration
-    ShutdownTimeout time.Duration
-    LogLevel        string
-    Environment     string
+    Port               string
+    ReadTimeout        time.Duration
+    WriteTimeout       time.Duration
+    IdleTimeout        time.Duration
+    ShutdownTimeout    time.Duration
+    LogLevel           string
+    Environment        string
+    OtelEnabled        bool
+    OtelEndpoint       string
+    OtelServiceName    string
+    OtelServiceVersion string
 }
+
+// Generic getEnv function handles all types
+func getEnv[T any](key string, defaultValue T) T {
+    // Type switch handles string, bool, time.Duration automatically
+}
+```
 ```
 
 ### Logging Layer
@@ -124,7 +136,7 @@ Structured logging using `log/slog`:
 - JSON format in production (machine-parseable)
 - Text format in development (human-readable)
 - Configurable log levels
-- Context-aware logging includes trace IDs
+- Context-aware logging includes OpenTelemetry trace IDs
 
 **Pattern**: Single logger instance created at startup, passed to all components.
 
@@ -132,6 +144,32 @@ Structured logging using `log/slog`:
 // Usage
 log := logger.New(cfg.Environment, cfg.LogLevel)
 log.InfoContext(ctx, "message", slog.String("key", "value"))
+```
+
+### OpenTelemetry Layer
+
+**Package**: `pkg/otel`
+**File**: `otel.go`
+
+Distributed tracing and metrics using OpenTelemetry:
+- W3C Trace Context propagation
+- OTLP HTTP exporter for traces and metrics
+- Automatic span creation for HTTP requests
+- Resource attributes (service name, version, environment)
+- Configurable via environment variables
+
+**Pattern**: Initialize at startup, shutdown gracefully with context.
+
+```go
+// Initialize OpenTelemetry
+otelShutdown, err := otel.Setup(context.Background(), otel.Config{
+    ServiceName:    cfg.OtelServiceName,
+    ServiceVersion: cfg.OtelServiceVersion,
+    Environment:    cfg.Environment,
+    Endpoint:       cfg.OtelEndpoint,
+    Enabled:        cfg.OtelEnabled,
+}, log)
+defer otelShutdown(context.Background())
 ```
 
 ### HTTP Layer
@@ -155,12 +193,13 @@ func New(cfg *config.Config, logger *slog.Logger, h *handler.Handler) *http.Serv
     mux.HandleFunc("GET /health", h.Health)
     mux.HandleFunc("GET /ready", h.Ready)
     mux.HandleFunc("GET /api/example", h.Example)
+    mux.HandleFunc("GET /swagger/", httpSwagger.WrapHandler)
 
     // Apply middleware chain
     var httpHandler http.Handler = mux
     httpHandler = middleware.Logging(logger)(httpHandler)
     httpHandler = middleware.Recovery(logger)(httpHandler)
-    httpHandler = middleware.TraceID(httpHandler)
+    httpHandler = middleware.Tracing(cfg.OtelServiceName)(httpHandler)
 
     return &http.Server{
         Addr:         fmt.Sprintf(":%s", cfg.Port),
@@ -286,9 +325,9 @@ func (r *Repository) GetExampleData(ctx context.Context, name string) (*model.Ex
 
 HTTP middleware for cross-cutting concerns:
 
-1. **TraceID**: Generates unique trace ID using `crypto/rand`, adds to context and response header
+1. **Tracing**: OpenTelemetry middleware that creates spans, extracts W3C Trace Context, adds trace ID to response header
 2. **Recovery**: Catches panics, logs with context, returns 500 with JSON error
-3. **Logging**: Logs requests with method, path, status, duration, trace ID
+3. **Logging**: Logs requests with method, path, status, duration, and OpenTelemetry trace ID
 
 **Pattern**: Middleware chain using higher-order functions.
 
@@ -296,16 +335,16 @@ HTTP middleware for cross-cutting concerns:
 var httpHandler http.Handler = mux
 httpHandler = middleware.Logging(logger)(httpHandler)
 httpHandler = middleware.Recovery(logger)(httpHandler)
-httpHandler = middleware.TraceID(httpHandler)
+httpHandler = middleware.Tracing(cfg.OtelServiceName)(httpHandler)
 ```
 
-**Order matters**: Applied in reverse (TraceID → Recovery → Logging → Handler).
+**Order matters**: Applied in reverse (Tracing → Recovery → Logging → Handler).
 
 **Key features**:
-- TraceID uses cryptographically random IDs via `crypto/rand`
+- Tracing creates OpenTelemetry spans and adds W3C trace ID to `X-Trace-ID` header
 - Recovery properly handles error response writing with error checking
-- Logging captures status code using a wrapped `responseWriter`
-- All middleware is context-aware and includes trace IDs in logs
+- Logging captures status code and includes OpenTelemetry trace ID in logs
+- All middleware is context-aware for distributed tracing
 
 ## Key Patterns
 
@@ -315,25 +354,26 @@ Request context flows through the entire stack:
 
 ```
 HTTP Request
-  → TraceID Middleware (generates ID, adds to context & response header)
+  → Tracing Middleware (creates OTel span, extracts/injects W3C Trace Context, adds X-Trace-ID header)
     → Recovery Middleware (defers panic recovery with context)
-      → Logging Middleware (captures start time)
+      → Logging Middleware (captures start time, extracts OTel trace ID)
         → Handler (extracts context, query params)
           → Service (receives context, checks cancellation, business logic)
             → Repository (receives context, data access)
             ← Returns data or error
           ← Service returns result or error
         ← Handler returns JSON response
-      ← Logging logs with duration, status, trace ID
+      ← Logging logs with duration, status, OTel trace ID
     ← Recovery catches any panics
-  ← Response (includes X-Trace-ID header)
+  ← Response (includes X-Trace-ID header with W3C trace ID format)
 ```
 
 **Key points:**
 - Context flows from `http.Request.Context()` through all layers
-- Trace ID is extracted using `middleware.GetTraceID(ctx)`
-- All logging includes trace ID automatically via `logger.InfoContext(ctx, ...)`
+- OpenTelemetry trace ID is extracted using `middleware.GetTraceID(ctx)` (returns W3C format: 32-char hex)
+- All logging includes OpenTelemetry trace ID via `logger.InfoContext(ctx, ...)`
 - Context cancellation propagates from client disconnect through all layers
+- Trace context follows W3C Trace Context specification for distributed tracing
 
 ### Graceful Shutdown
 
@@ -404,16 +444,20 @@ cfg := config.Load()
 // 2. Initialize logger
 log := logger.New(cfg.Environment, cfg.LogLevel)
 
-// 3. Initialize repository (bottom layer)
+// 3. Initialize OpenTelemetry
+otelShutdown, err := otel.Setup(context.Background(), otel.Config{...}, log)
+defer otelShutdown(context.Background())
+
+// 4. Initialize repository (bottom layer)
 repo := repository.New(log)
 
-// 4. Initialize service (middle layer)
+// 5. Initialize service (middle layer)
 svc := service.New(log, repo)
 
-// 5. Initialize handler (top layer)
+// 6. Initialize handler (top layer)
 h := handler.New(log, svc)
 
-// 6. Create HTTP server
+// 7. Create HTTP server
 srv := server.New(cfg, log, h)
 ```
 
@@ -669,16 +713,18 @@ All timeouts prevent resource exhaustion attacks.
 
 ### Trace IDs
 
-Use cryptographically random trace IDs via `crypto/rand`, not predictable sequences.
+OpenTelemetry generates W3C compliant trace IDs automatically. The trace ID format is a 32-character hexadecimal string (128-bit) following the W3C Trace Context specification.
 
 ## Operational Excellence
 
 ### Observability
 
 - Structured JSON logs in production
-- Trace IDs for request correlation
+- OpenTelemetry distributed tracing with W3C Trace Context
+- Metrics exported via OTLP (request counts, durations, etc.)
+- Swagger/OpenAPI documentation at `/swagger/`
 - Health and readiness endpoints
-- HTTP access logs with duration
+- HTTP access logs with OpenTelemetry trace IDs
 
 ### Configuration
 
@@ -744,22 +790,13 @@ Use cryptographically random trace IDs via `crypto/rand`, not predictable sequen
 The service already has a solid foundation. As it grows, consider:
 
 1. ✅ **Package structure**: Already using `/cmd`, `/internal`, `/pkg`
-2. **Wire dependency injection**: Generate DI code for complex dependency graphs
-3. **OpenAPI spec**: Document API with OpenAPI 3.0 / Swagger
-4. **Prometheus metrics**: Track request rates, errors, latency
+2. ✅ **OpenAPI spec**: Swagger documentation available at `/swagger/`
+3. ✅ **Distributed tracing**: OpenTelemetry with OTLP exporter for traces and metrics
+4. **Wire dependency injection**: Generate DI code for complex dependency graphs
+5. **Prometheus metrics**: Expose Prometheus-format metrics endpoint
    ```go
-   // Add metrics middleware
-   httpHandler = middleware.Metrics()(httpHandler)
+   // Add Prometheus handler alongside OTLP metrics
    mux.Handle("/metrics", promhttp.Handler())
-   ```
-5. **Distributed tracing**: Add OpenTelemetry support
-   ```go
-   // Initialize tracer
-   tp := trace.NewTracerProvider(...)
-   otel.SetTracerProvider(tp)
-
-   // Add tracing middleware
-   httpHandler = otelhttp.NewHandler(httpHandler, "server")
    ```
 6. **Database**: Add connection pooling and migrations (see "Adding Database" above)
 7. **Caching**: Add Redis for performance
