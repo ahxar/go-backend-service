@@ -288,7 +288,7 @@ Test complete request flow:
 
 ```go
 // Handler testing
-req := httptest.NewRequest(http.MethodGet, "/health", nil)
+req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
 rec := httptest.NewRecorder()
 handler.ServeHTTP(rec, req)
 assert.Equal(t, http.StatusOK, rec.Code)

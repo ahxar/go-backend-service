@@ -25,7 +25,6 @@ build/
 dist/
 
 # Application binary
-server
 /server
 
 # Environment files

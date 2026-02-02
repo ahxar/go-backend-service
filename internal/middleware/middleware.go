@@ -45,7 +45,9 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 
 					w.Header().Set("Content-Type", "application/json")
 					w.WriteHeader(http.StatusInternalServerError)
-					w.Write([]byte(`{"error":"internal server error"}`))
+					if _, err := w.Write([]byte(`{"error":"internal server error"}`)); err != nil {
+						logger.ErrorContext(ctx, "failed to write error response", slog.Any("error", err))
+					}
 				}
 			}()
 

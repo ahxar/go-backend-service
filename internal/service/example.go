@@ -16,7 +16,7 @@ type ExampleService interface {
 
 // ProcessExample processes an example request with business logic
 func (s *Service) ProcessExample(ctx context.Context, name string) (*model.ExampleResponse, error) {
-	// Check if context is already cancelled
+	// Check if context is already canceled
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()

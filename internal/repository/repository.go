@@ -7,9 +7,6 @@ import (
 // Repository provides data access methods
 type Repository struct {
 	logger *slog.Logger
-	// Add database connections here:
-	// db *sql.DB
-	// cache *redis.Client
 }
 
 // New creates a new Repository instance

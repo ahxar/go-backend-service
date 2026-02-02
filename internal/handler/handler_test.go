@@ -25,7 +25,7 @@ func setupTestHandler() *Handler {
 func TestHealth(t *testing.T) {
 	h := setupTestHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	req := httptest.NewRequest(http.MethodGet, "/health", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	h.Health(rec, req)
@@ -47,7 +47,7 @@ func TestHealth(t *testing.T) {
 func TestReady(t *testing.T) {
 	h := setupTestHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/ready", nil)
+	req := httptest.NewRequest(http.MethodGet, "/ready", http.NoBody)
 	rec := httptest.NewRecorder()
 
 	h.Ready(rec, req)
@@ -69,7 +69,7 @@ func TestReady(t *testing.T) {
 func TestExample(t *testing.T) {
 	h := setupTestHandler()
 
-	req := httptest.NewRequest(http.MethodGet, "/api/example?name=Test", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/example?name=Test", http.NoBody)
 	req = req.WithContext(context.Background())
 	rec := httptest.NewRecorder()
 
