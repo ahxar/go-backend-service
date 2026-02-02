@@ -1,0 +1,107 @@
+basePath: /
+definitions:
+  model.ErrorResponse:
+    properties:
+      error:
+        type: string
+    type: object
+  model.ExampleResponse:
+    properties:
+      message:
+        type: string
+      processed:
+        type: boolean
+      timestamp:
+        type: string
+    type: object
+  model.HealthResponse:
+    properties:
+      status:
+        type: string
+    type: object
+  model.ReadyResponse:
+    properties:
+      status:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@example.com
+    name: API Support
+    url: http://github.com/ahxar/go-backend-service
+  description: A production-ready HTTP service built with Go's standard library
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Go Backend Service API
+  version: "1.0"
+paths:
+  /api/example:
+    get:
+      consumes:
+      - application/json
+      description: A sample endpoint demonstrating the full request lifecycle
+      parameters:
+      - default: World
+        description: Name to greet
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ExampleResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Example endpoint
+      tags:
+      - example
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Check if the service is alive
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.HealthResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Health check
+      tags:
+      - health
+  /ready:
+    get:
+      consumes:
+      - application/json
+      description: Check if the service is ready to handle traffic
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/model.ReadyResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/model.ErrorResponse'
+      summary: Readiness check
+      tags:
+      - health
+schemes:
+- http
+- https
+swagger: "2.0"

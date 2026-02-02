@@ -1,5 +1,21 @@
 package main
 
+// @title Go Backend Service API
+// @version 1.0
+// @description A production-ready HTTP service built with Go's standard library
+// @termsOfService http://swagger.io/terms/
+
+// @contact.name API Support
+// @contact.url http://github.com/ahxar/go-backend-service
+// @contact.email support@example.com
+
+// @license.name MIT
+// @license.url https://opensource.org/licenses/MIT
+
+// @host localhost:8080
+// @BasePath /
+// @schemes http https
+
 import (
 	"context"
 	"log/slog"
@@ -14,6 +30,7 @@ import (
 	"github.com/ahxar/go-backend-service/internal/server"
 	"github.com/ahxar/go-backend-service/internal/service"
 	"github.com/ahxar/go-backend-service/pkg/logger"
+	"github.com/ahxar/go-backend-service/pkg/otel"
 )
 
 func main() {
@@ -28,6 +45,28 @@ func main() {
 		slog.String("environment", cfg.Environment),
 		slog.String("log_level", cfg.LogLevel),
 	)
+
+	// Initialize OpenTelemetry
+	otelShutdown, err := otel.Setup(context.Background(), otel.Config{
+		ServiceName:    cfg.OtelServiceName,
+		ServiceVersion: cfg.OtelServiceVersion,
+		Environment:    cfg.Environment,
+		Endpoint:       cfg.OtelEndpoint,
+		Enabled:        cfg.OtelEnabled,
+	}, log)
+	if err != nil {
+		log.Error("failed to setup OpenTelemetry",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := otelShutdown(context.Background()); err != nil {
+			log.Error("failed to shutdown OpenTelemetry",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 
 	// Initialize repository layer
 	// In a real app, this would include database connections

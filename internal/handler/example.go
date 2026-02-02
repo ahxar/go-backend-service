@@ -8,6 +8,15 @@ import (
 )
 
 // Example handles example API requests
+// @Summary Example endpoint
+// @Description A sample endpoint demonstrating the full request lifecycle
+// @Tags example
+// @Accept json
+// @Produce json
+// @Param name query string false "Name to greet" default(World)
+// @Success 200 {object} model.ExampleResponse
+// @Failure 500 {object} model.ErrorResponse
+// @Router /api/example [get]
 func (h *Handler) Example(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 

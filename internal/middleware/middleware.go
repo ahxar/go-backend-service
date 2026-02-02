@@ -2,32 +2,16 @@ package middleware
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
-
-// contextKey is a custom type for context keys to avoid collisions
-type contextKey string
-
-const traceIDKey contextKey = "trace_id"
-
-// TraceID generates a unique trace ID for each request
-func TraceID(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		traceID := generateTraceID()
-
-		// Add trace ID to response header
-		w.Header().Set("X-Trace-ID", traceID)
-
-		// Add trace ID to request context
-		ctx := context.WithValue(r.Context(), traceIDKey, traceID)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
 
 // Recovery catches panics and returns 500 errors
 func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
@@ -73,12 +57,16 @@ func Logging(logger *slog.Logger) func(http.Handler) http.Handler {
 			duration := time.Since(start)
 			ctx := r.Context()
 
+			// Get trace ID from OpenTelemetry span
+			traceID := GetTraceID(ctx)
+
 			logger.InfoContext(ctx, "http request",
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
 				slog.Int("status", wrapped.statusCode),
 				slog.Duration("duration", duration),
 				slog.String("remote_addr", r.RemoteAddr),
+				slog.String("trace_id", traceID),
 			)
 		})
 	}
@@ -95,20 +83,65 @@ func (rw *responseWriter) WriteHeader(code int) {
 	rw.ResponseWriter.WriteHeader(code)
 }
 
-// generateTraceID creates a random trace ID
-func generateTraceID() string {
-	b := make([]byte, 16)
-	if _, err := rand.Read(b); err != nil {
-		// Fallback to timestamp-based ID if random fails
-		return hex.EncodeToString([]byte(time.Now().String()))
-	}
-	return hex.EncodeToString(b)
-}
-
-// GetTraceID extracts the trace ID from context
+// GetTraceID extracts the OpenTelemetry trace ID from context
 func GetTraceID(ctx context.Context) string {
-	if traceID, ok := ctx.Value(traceIDKey).(string); ok {
-		return traceID
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().IsValid() {
+		return span.SpanContext().TraceID().String()
 	}
 	return ""
+}
+
+// Tracing creates OpenTelemetry traces for HTTP requests
+func Tracing(serviceName string) func(http.Handler) http.Handler {
+	tracer := otel.Tracer(serviceName)
+	propagator := otel.GetTextMapPropagator()
+
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Extract context from incoming request headers
+			ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+
+			// Start a new span
+			ctx, span := tracer.Start(ctx, r.Method+" "+r.URL.Path,
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithAttributes(
+					attribute.String("http.method", r.Method),
+					attribute.String("http.url", r.URL.String()),
+					attribute.String("http.scheme", r.URL.Scheme),
+					attribute.String("http.host", r.Host),
+					attribute.String("http.target", r.URL.Path),
+					attribute.String("http.user_agent", r.UserAgent()),
+					attribute.String("http.remote_addr", r.RemoteAddr),
+				),
+			)
+			defer span.End()
+
+			// Add OpenTelemetry trace ID to response header
+			if span.SpanContext().IsValid() {
+				w.Header().Set("X-Trace-ID", span.SpanContext().TraceID().String())
+			}
+
+			// Wrap response writer to capture status code
+			wrapped := &responseWriter{
+				ResponseWriter: w,
+				statusCode:     http.StatusOK,
+			}
+
+			// Serve the request
+			next.ServeHTTP(wrapped, r.WithContext(ctx))
+
+			// Add response attributes
+			span.SetAttributes(
+				attribute.Int("http.status_code", wrapped.statusCode),
+			)
+
+			// Set span status based on HTTP status code
+			if wrapped.statusCode >= 400 {
+				span.SetStatus(codes.Error, http.StatusText(wrapped.statusCode))
+			} else {
+				span.SetStatus(codes.Ok, "")
+			}
+		})
+	}
 }

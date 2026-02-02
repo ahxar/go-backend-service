@@ -9,7 +9,7 @@ VERSION?=$(shell git describe --tags --always --dirty)
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-build: ## Build the application
+build: swagger-gen ## Build the application
 	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	@CGO_ENABLED=0 go build -ldflags="-w -s -X main.Version=$(VERSION)" -o $(BUILD_DIR)/$(APP_NAME) $(CMD_PATH)
@@ -55,11 +55,11 @@ clean: ## Clean build artifacts
 	@rm -f coverage.out coverage.html
 	@go clean
 
-run: ## Run the application
+run: swagger-gen ## Run the application
 	@echo "Running $(APP_NAME)..."
 	@go run $(CMD_PATH)
 
-dev: ## Run in development mode with air (hot reload)
+dev: swagger-gen ## Run in development mode with air (hot reload)
 	@echo "Running in development mode..."
 	@air
 
@@ -80,9 +80,23 @@ install-tools: ## Install development tools
 	@go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 	@go install golang.org/x/tools/cmd/goimports@latest
 	@go install github.com/cosmtrek/air@latest
+	@go install github.com/swaggo/swag/cmd/swag@latest
 
 check: lint vet test ## Run all checks
 
-ci: mod-verify check build ## Run CI pipeline locally
+ci: mod-verify check swagger-gen build ## Run CI pipeline locally
+
+swagger-gen: ## Generate Swagger documentation
+	@echo "Generating Swagger documentation..."
+	@swag init -g cmd/server/main.go -o docs
+	@echo "Swagger documentation generated in docs/"
+
+swagger-install: ## Install Swagger CLI tool
+	@echo "Installing Swagger CLI tool..."
+	@go install github.com/swaggo/swag/cmd/swag@latest
+
+swagger-fmt: ## Format Swagger comments
+	@echo "Formatting Swagger comments..."
+	@swag fmt
 
 .DEFAULT_GOAL := help
