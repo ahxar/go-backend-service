@@ -390,7 +390,6 @@ if err := s.repo.Save(ctx, data); err != nil {
 ## Documentation
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - Detailed architecture decisions
-- [API Documentation](docs/README.md) - Complete API reference
 - [Request Lifecycle](docs/request-lifecycle.puml) - Request flow diagram
 - [Graceful Shutdown](docs/graceful-shutdown.puml) - Shutdown sequence
 

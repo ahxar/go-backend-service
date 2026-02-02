@@ -351,7 +351,7 @@ Use cryptographically random trace IDs via `crypto/rand`, not predictable sequen
 ### Deployment
 
 - Stateless service (horizontally scalable)
-- Health checks for Kubernetes
+- Health check endpoints
 - Graceful shutdown for zero-downtime deploys
 - Small binary size (stdlib only)
 
@@ -415,4 +415,3 @@ As the service grows, consider:
 - [Effective Go](https://go.dev/doc/effective_go)
 - [Go Code Review Comments](https://github.com/golang/go/wiki/CodeReviewComments)
 - [12-Factor App](https://12factor.net/)
-- [Kubernetes Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
