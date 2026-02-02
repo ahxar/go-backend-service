@@ -12,10 +12,9 @@ A production-ready Go HTTP service built with clean 3-layer architecture using o
 - **Request Tracing** - Unique trace ID per request for distributed tracing
 - **Context Propagation** - Request context flows through entire stack
 - **Explicit Timeouts** - Configured at server and request levels
-- **Health & Readiness** - Kubernetes-compatible health check endpoints
+- **Health & Readiness** - Health check endpoints
 - **12-Factor Config** - Environment-based configuration
-- **CI/CD Ready** - GitHub Actions for testing, linting, building, and releasing
-- **Docker Support** - Multi-stage Dockerfile with scratch base image
+- **CI/CD Ready** - GitHub Actions for testing, linting, and building
 
 ## Project Structure
 
@@ -53,13 +52,11 @@ A production-ready Go HTTP service built with clean 3-layer architecture using o
 │       └── logger.go            # Reusable logger package
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml               # CI pipeline
-│       └── docker.yml           # Docker build & push
+│       └── ci.yml               # CI pipeline
 ├── docs/                        # Documentation
-├── Dockerfile                   # Multi-stage Docker build
 ├── Makefile                     # Build automation
 ├── .golangci.yml               # Linter configuration
-├── .dockerignore
+├── .gitignore
 ├── .env.example
 ├── go.mod
 └── README.md
@@ -116,9 +113,6 @@ make build
 
 # Build for all platforms
 make build-all
-
-# Build Docker image
-make docker-build
 
 # Using go directly
 go build -o server ./cmd/server
@@ -181,7 +175,7 @@ All configuration via environment variables:
 
 See `.env.example` for a complete configuration template.
 
-## CI/CD Pipelines
+## CI/CD Pipeline
 
 ### Continuous Integration (`.github/workflows/ci.yml`)
 
@@ -191,97 +185,6 @@ Runs on push and pull requests:
 - **Lint**: golangci-lint with comprehensive checks
 - **Build**: Verify binary builds successfully
 - **Security**: Gosec security scanner
-
-### Docker (`.github/workflows/docker.yml`)
-
-Builds and pushes Docker images:
-
-- Multi-stage build with scratch base
-- Pushed to GitHub Container Registry
-- Tagged with branch, PR, semver, and commit SHA
-
-## Docker Deployment
-
-### Build and Run
-
-```bash
-# Build image
-docker build -t go-backend-service .
-
-# Run container
-docker run -p 8080:8080 --env-file .env go-backend-service
-
-# Using make
-make docker-build
-make docker-run
-```
-
-### Docker Compose
-
-```yaml
-version: "3.8"
-services:
-  api:
-    build: .
-    ports:
-      - "8080:8080"
-    environment:
-      - ENVIRONMENT=production
-      - LOG_LEVEL=info
-    healthcheck:
-      test: ["CMD", "/server", "--health-check"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-```
-
-## Kubernetes Deployment
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: go-backend-service
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: go-backend-service
-  template:
-    metadata:
-      labels:
-        app: go-backend-service
-    spec:
-      containers:
-        - name: server
-          image: ghcr.io/safar/go-backend-service:latest
-          ports:
-            - containerPort: 8080
-          env:
-            - name: ENVIRONMENT
-              value: "production"
-            - name: LOG_LEVEL
-              value: "info"
-          resources:
-            requests:
-              memory: "64Mi"
-              cpu: "250m"
-            limits:
-              memory: "128Mi"
-              cpu: "500m"
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /ready
-              port: 8080
-            initialDelaySeconds: 5
-            periodSeconds: 5
-```
 
 ## Adding New Features
 
@@ -390,8 +293,6 @@ make lint              # Run linters
 make fmt               # Format code
 make clean             # Clean build artifacts
 make run               # Run application
-make docker-build      # Build Docker image
-make docker-run        # Run Docker container
 make check             # Run all checks (lint + vet + test)
 make ci                # Run full CI pipeline locally
 ```
@@ -485,7 +386,6 @@ if err := s.repo.Save(ctx, data); err != nil {
 - Timeouts on all operations
 - Panic recovery middleware
 - Input validation at handler layer
-- Secure Docker image (scratch base, non-root user)
 
 ## Documentation
 
@@ -511,6 +411,6 @@ MIT
 ✅ Production-ready 3-layer architecture
 ✅ Comprehensive test coverage
 ✅ CI/CD automation with GitHub Actions
-✅ Docker and Kubernetes support
+✅ Health check endpoints
 ✅ Zero external dependencies
 ✅ Extensive documentation

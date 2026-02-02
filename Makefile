@@ -1,10 +1,9 @@
-.PHONY: help build test lint clean run docker-build docker-run
+.PHONY: help build test lint clean run
 
 # Variables
 APP_NAME=server
 CMD_PATH=./cmd/server
 BUILD_DIR=./bin
-DOCKER_IMAGE=go-backend-service
 VERSION?=$(shell git describe --tags --always --dirty)
 
 help: ## Display this help screen
@@ -63,19 +62,6 @@ run: ## Run the application
 dev: ## Run in development mode with air (hot reload)
 	@echo "Running in development mode..."
 	@air
-
-docker-build: ## Build Docker image
-	@echo "Building Docker image..."
-	@docker build -t $(DOCKER_IMAGE):$(VERSION) -t $(DOCKER_IMAGE):latest .
-
-docker-run: ## Run Docker container
-	@echo "Running Docker container..."
-	@docker run --rm -p 8080:8080 --env-file .env $(DOCKER_IMAGE):latest
-
-docker-push: ## Push Docker image
-	@echo "Pushing Docker image..."
-	@docker push $(DOCKER_IMAGE):$(VERSION)
-	@docker push $(DOCKER_IMAGE):latest
 
 mod-download: ## Download Go modules
 	@echo "Downloading modules..."
