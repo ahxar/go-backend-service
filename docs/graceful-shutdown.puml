@@ -1,0 +1,60 @@
+@startuml Graceful Shutdown
+!theme plain
+skinparam sequenceMessageAlign center
+
+actor User
+participant "OS" as OS
+participant "Signal\nHandler" as Signal
+participant "Main\nGoroutine" as Main
+participant "Server\nGoroutine" as ServerGo
+participant "HTTP\nServer" as Server
+participant "In-Flight\nRequests" as Requests
+
+Main -> Signal: signal.NotifyContext(SIGINT, SIGTERM)
+activate Signal
+Main -> ServerGo: go server.ListenAndServe()
+activate ServerGo
+ServerGo -> Server: Start listening on :8080
+activate Server
+Main -> Main: <-ctx.Done() [blocking]
+note right: Main goroutine blocks,\nwaiting for shutdown signal
+
+== Normal Operation ==
+
+User -> Server: HTTP requests
+activate Requests
+Server -> Requests: Handle requests
+Requests --> Server: Responses
+Requests --> User: Responses
+
+== Shutdown Initiated ==
+
+User -> OS: Ctrl+C / SIGTERM
+OS -> Signal: Send signal
+Signal -> Main: ctx.Done() closes
+deactivate Signal
+activate Main
+
+Main -> Main: logger.Info("shutdown signal received")
+Main -> Main: shutdownCtx = WithTimeout(15s)
+Main -> Server: Shutdown(shutdownCtx)
+
+Server -> Server: Stop accepting new connections
+note right: No new connections accepted
+
+Server -> Requests: Wait for completion
+note right: Server waits for\nin-flight requests\n(up to 15s timeout)
+
+Requests -> Requests: Complete processing
+Requests --> Server: All requests complete
+deactivate Requests
+
+Server --> Main: Shutdown complete
+deactivate Server
+
+Main -> Main: logger.Info("server stopped gracefully")
+Main -> Main: os.Exit(0)
+deactivate Main
+deactivate ServerGo
+
+@enduml

@@ -1,0 +1,67 @@
+package config
+
+import (
+	"os"
+	"testing"
+	"time"
+)
+
+func TestLoad_Defaults(t *testing.T) {
+	clearEnv()
+
+	cfg := Load()
+
+	if cfg.Port != "8080" {
+		t.Errorf("expected port 8080, got %s", cfg.Port)
+	}
+
+	if cfg.ReadTimeout != 5*time.Second {
+		t.Errorf("expected read timeout 5s, got %v", cfg.ReadTimeout)
+	}
+
+	if cfg.WriteTimeout != 10*time.Second {
+		t.Errorf("expected write timeout 10s, got %v", cfg.WriteTimeout)
+	}
+
+	if cfg.LogLevel != "info" {
+		t.Errorf("expected log level info, got %s", cfg.LogLevel)
+	}
+
+	if cfg.Environment != "development" {
+		t.Errorf("expected environment development, got %s", cfg.Environment)
+	}
+}
+
+func TestLoad_CustomValues(t *testing.T) {
+	clearEnv()
+
+	os.Setenv("PORT", "9000")
+	os.Setenv("LOG_LEVEL", "debug")
+	os.Setenv("ENVIRONMENT", "production")
+
+	defer clearEnv()
+
+	cfg := Load()
+
+	if cfg.Port != "9000" {
+		t.Errorf("expected port 9000, got %s", cfg.Port)
+	}
+
+	if cfg.LogLevel != "debug" {
+		t.Errorf("expected log level debug, got %s", cfg.LogLevel)
+	}
+
+	if cfg.Environment != "production" {
+		t.Errorf("expected environment production, got %s", cfg.Environment)
+	}
+}
+
+func clearEnv() {
+	os.Unsetenv("PORT")
+	os.Unsetenv("READ_TIMEOUT")
+	os.Unsetenv("WRITE_TIMEOUT")
+	os.Unsetenv("IDLE_TIMEOUT")
+	os.Unsetenv("SHUTDOWN_TIMEOUT")
+	os.Unsetenv("LOG_LEVEL")
+	os.Unsetenv("ENVIRONMENT")
+}

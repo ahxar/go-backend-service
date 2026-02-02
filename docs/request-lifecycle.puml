@@ -1,0 +1,79 @@
+@startuml Request Lifecycle
+!theme plain
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor Client
+participant "HTTP Server" as Server
+participant "TraceID\nMiddleware" as TraceID
+participant "Recovery\nMiddleware" as Recovery
+participant "Logging\nMiddleware" as Logging
+participant "Handler" as Handler
+participant "Service" as Service
+database "Context" as Context
+
+Client -> Server: GET /api/example?name=Go
+activate Server
+
+Server -> TraceID: ServeHTTP(w, r)
+activate TraceID
+TraceID -> TraceID: generateTraceID()
+TraceID -> Context: ctx = WithValue(r.Context(), traceID)
+TraceID -> TraceID: w.Header.Set("X-Trace-ID", traceID)
+
+TraceID -> Recovery: ServeHTTP(w, r.WithContext(ctx))
+activate Recovery
+Recovery -> Recovery: defer recover()
+
+Recovery -> Logging: ServeHTTP(w, r)
+activate Logging
+Logging -> Logging: start = time.Now()
+
+Logging -> Handler: ServeHTTP(w, r)
+activate Handler
+Handler -> Handler: ctx := r.Context()
+Handler -> Handler: name := r.URL.Query().Get("name")
+
+Handler -> Service: GetExample(ctx, name)
+activate Service
+Service -> Service: select { case <-ctx.Done() }
+Service -> Context: logger.InfoContext(ctx, "processing request")
+note right
+  Logs include trace_id
+  from context
+end note
+
+Service -> Service: time.Sleep(100ms)
+Service -> Service: select { case <-ctx.Done() }
+Service -> Service: result = map[string]any{...}
+Service --> Handler: result, nil
+deactivate Service
+
+Handler -> Handler: writeJSON(w, 200, result)
+Handler --> Logging: return
+deactivate Handler
+
+Logging -> Logging: duration := time.Since(start)
+Logging -> Context: logger.InfoContext(ctx, "http request", ...)
+note right
+  Logs: method, path, status,
+  duration, trace_id
+end note
+Logging --> Recovery: return
+deactivate Logging
+
+Recovery --> TraceID: return
+deactivate Recovery
+
+TraceID --> Server: return
+deactivate TraceID
+
+Server --> Client: 200 OK + JSON body
+note left
+  Headers:
+  X-Trace-ID: abc123...
+  Content-Type: application/json
+end note
+deactivate Server
+
+@enduml

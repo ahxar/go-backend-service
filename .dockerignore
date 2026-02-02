@@ -1,0 +1,43 @@
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+server
+*.test
+*.out
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# CI/CD
+.github
+
+# Documentation
+*.md
+docs/
+
+# Test files
+*_test.go
+
+# Local environment
+.env
+.env.local
+
+# Build artifacts
+coverage.out
+*.log
+
+# macOS
+.DS_Store
+
+# Claude
+.claude
