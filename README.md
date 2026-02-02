@@ -13,6 +13,7 @@ go run ./cmd/server
 ```
 
 That's it! The service is running with:
+
 - ✅ Health check endpoint
 - ✅ OpenTelemetry distributed tracing
 - ✅ Structured logging with trace correlation
@@ -24,7 +25,7 @@ That's it! The service is running with:
 This template provides a solid foundation for building HTTP services in Go:
 
 - **Clean Architecture** - 3-layer separation (Handler → Service → Repository)
-- **Minimal Dependencies** - Built on Go 1.21+ standard library with OpenTelemetry
+- **Minimal Dependencies** - Built on Go 1.24+ standard library with OpenTelemetry
 - **Production Ready** - OpenTelemetry tracing/metrics, Swagger docs, health checks, graceful shutdown
 - **Well Tested** - Comprehensive test coverage with examples
 - **CI/CD** - GitHub Actions workflow for testing and linting
@@ -43,7 +44,8 @@ This template provides a solid foundation for building HTTP services in Go:
 ## 💻 Installation
 
 **Prerequisites:**
-- Go 1.21 or higher
+
+- Go 1.24 or higher
 - Make (optional, but recommended)
 
 **Get started:**
@@ -111,6 +113,7 @@ make check
 ### OpenTelemetry Observability
 
 Full distributed tracing and metrics powered by OpenTelemetry:
+
 - **W3C Trace Context**: Standard trace propagation across services
 - **Automatic Instrumentation**: HTTP requests automatically traced
 - **OTLP Export**: Traces and metrics exported to any OTLP-compatible backend (Jaeger, Tempo, etc.)
@@ -127,12 +130,14 @@ OTEL_SERVICE_NAME=go-backend-service
 ### Swagger/OpenAPI Documentation
 
 Interactive API documentation automatically generated from code annotations:
+
 - **Swagger UI**: Available at `http://localhost:8080/swagger/`
 - **OpenAPI 3.0**: Standard API specification
 - **Auto-generated**: Regenerated on every build/run
 - **Type-safe**: Swagger annotations validated at compile time
 
 Generate docs manually:
+
 ```bash
 make swagger-gen
 ```
@@ -140,6 +145,7 @@ make swagger-gen
 ### Generic Configuration
 
 Type-safe configuration loading with a single generic function:
+
 ```go
 // Supports string, bool, time.Duration automatically
 Port:        getEnv("PORT", "8080")
@@ -150,6 +156,7 @@ ReadTimeout: getEnv("READ_TIMEOUT", 5*time.Second)
 ## 🌐 API Endpoints
 
 ### Health Check
+
 Check if the service is alive.
 
 ```bash
@@ -157,11 +164,13 @@ curl http://localhost:8080/health
 ```
 
 **Response:**
+
 ```json
-{"status":"healthy"}
+{ "status": "healthy" }
 ```
 
 ### Readiness Check
+
 Check if the service is ready to handle traffic.
 
 ```bash
@@ -169,11 +178,13 @@ curl http://localhost:8080/ready
 ```
 
 **Response:**
+
 ```json
-{"status":"ready"}
+{ "status": "ready" }
 ```
 
 ### Example Endpoint
+
 A sample endpoint demonstrating the full request lifecycle.
 
 ```bash
@@ -181,6 +192,7 @@ curl http://localhost:8080/api/example?name=World
 ```
 
 **Response:**
+
 ```json
 {
   "message": "Hello, World!",
@@ -192,6 +204,7 @@ curl http://localhost:8080/api/example?name=World
 **Note:** Every response includes an `X-Trace-ID` header containing the OpenTelemetry trace ID for distributed tracing and request correlation across logs.
 
 ### Swagger Documentation
+
 Interactive API documentation with try-it-out functionality.
 
 ```bash
@@ -200,6 +213,7 @@ open http://localhost:8080/swagger/
 ```
 
 **Features:**
+
 - Try API endpoints directly from the browser
 - View request/response schemas
 - See all available parameters
@@ -209,21 +223,22 @@ open http://localhost:8080/swagger/
 
 Configure the service using environment variables:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `8080` | HTTP server port |
-| `LOG_LEVEL` | `info` | Log level: debug, info, warn, error |
-| `ENVIRONMENT` | `development` | Environment: development, production |
-| `READ_TIMEOUT` | `5s` | Maximum time to read requests |
-| `WRITE_TIMEOUT` | `10s` | Maximum time to write responses |
-| `IDLE_TIMEOUT` | `120s` | Keep-alive timeout |
-| `SHUTDOWN_TIMEOUT` | `15s` | Graceful shutdown timeout |
-| `OTEL_ENABLED` | `true` | Enable OpenTelemetry tracing/metrics |
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP endpoint for traces/metrics |
-| `OTEL_SERVICE_NAME` | `go-backend-service` | Service name for OpenTelemetry |
-| `OTEL_SERVICE_VERSION` | `1.0.0` | Service version for OpenTelemetry |
+| Variable                      | Default                 | Description                          |
+| ----------------------------- | ----------------------- | ------------------------------------ |
+| `PORT`                        | `8080`                  | HTTP server port                     |
+| `LOG_LEVEL`                   | `info`                  | Log level: debug, info, warn, error  |
+| `ENVIRONMENT`                 | `development`           | Environment: development, production |
+| `READ_TIMEOUT`                | `5s`                    | Maximum time to read requests        |
+| `WRITE_TIMEOUT`               | `10s`                   | Maximum time to write responses      |
+| `IDLE_TIMEOUT`                | `120s`                  | Keep-alive timeout                   |
+| `SHUTDOWN_TIMEOUT`            | `15s`                   | Graceful shutdown timeout            |
+| `OTEL_ENABLED`                | `true`                  | Enable OpenTelemetry tracing/metrics |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://localhost:4318` | OTLP endpoint for traces/metrics     |
+| `OTEL_SERVICE_NAME`           | `go-backend-service`    | Service name for OpenTelemetry       |
+| `OTEL_SERVICE_VERSION`        | `1.0.0`                 | Service version for OpenTelemetry    |
 
 **Example:**
+
 ```bash
 # Create a .env file (optional)
 cp .env.example .env
@@ -258,6 +273,7 @@ make install-tools
 ```
 
 This installs:
+
 - **golangci-lint** - Fast Go linters runner
 - **goimports** - Automatic import formatting
 - **air** - Live reload for development
@@ -283,33 +299,40 @@ make swagger-fmt       # Format Swagger comments
 This service follows a **3-layer architecture** for clean separation of concerns:
 
 ### 1. Handler Layer (`internal/handler/`)
+
 Handles HTTP requests and responses.
 
 **Responsibilities:**
+
 - Parse and validate requests
 - Format responses
 - Handle HTTP-specific concerns
 - Call the service layer
 
 ### 2. Service Layer (`internal/service/`)
+
 Contains business logic.
 
 **Responsibilities:**
+
 - Implement business rules
 - Orchestrate operations
 - Call the repository layer
 - Return results or errors
 
 ### 3. Repository Layer (`internal/repository/`)
+
 Manages data access.
 
 **Responsibilities:**
+
 - Database queries
 - External API calls
 - Cache operations
 - Data persistence
 
 **Request Flow:**
+
 ```
 HTTP Request → Handler → Service → Repository → Database
 HTTP Response ← Handler ← Service ← Repository ← Database
@@ -324,6 +347,7 @@ HTTP Response ← Handler ← Service ← Repository ← Database
 Follow these steps to add a new API endpoint:
 
 **1. Define your model** in `internal/model/`:
+
 ```go
 type User struct {
     ID   string `json:"id"`
@@ -332,6 +356,7 @@ type User struct {
 ```
 
 **2. Add repository method** in `internal/repository/`:
+
 ```go
 func (r *Repository) CreateUser(ctx context.Context, name string) (*model.User, error) {
     // Database logic here
@@ -340,6 +365,7 @@ func (r *Repository) CreateUser(ctx context.Context, name string) (*model.User, 
 ```
 
 **3. Add service method** in `internal/service/`:
+
 ```go
 func (s *Service) CreateUser(ctx context.Context, name string) (*model.User, error) {
     // Business logic here
@@ -348,6 +374,7 @@ func (s *Service) CreateUser(ctx context.Context, name string) (*model.User, err
 ```
 
 **4. Add handler** in `internal/handler/`:
+
 ```go
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
     // Parse request, call service, return response
@@ -355,6 +382,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 ```
 
 **5. Register route** in `internal/server/server.go`:
+
 ```go
 mux.HandleFunc("POST /api/users", h.CreateUser)
 ```
@@ -362,6 +390,7 @@ mux.HandleFunc("POST /api/users", h.CreateUser)
 ### Adding a Database
 
 **1. Update repository** to accept database connection:
+
 ```go
 type Repository struct {
     logger *slog.Logger
@@ -370,6 +399,7 @@ type Repository struct {
 ```
 
 **2. Initialize in main** (`cmd/server/main.go`):
+
 ```go
 db, err := sql.Open("postgres", os.Getenv("DATABASE_URL"))
 if err != nil {
@@ -385,17 +415,21 @@ repo := repository.New(log, db)
 As your service grows, organize code by domain:
 
 **Small service** (< 10 endpoints):
+
 - Keep each layer in one file per domain
 
 **Medium service** (10-50 endpoints):
+
 - Split handlers into separate files
 - Keep service and repository combined
 
 **Large service** (> 50 endpoints):
+
 - Create subdirectories per domain
 - Split all layers by feature
 
 Example structure for large services:
+
 ```
 internal/
   ├── handler/
@@ -426,6 +460,7 @@ open coverage.html
 ```
 
 **Testing strategy:**
+
 - **Unit tests** - Test individual components
 - **Integration tests** - Test layer interactions
 - **Table-driven tests** - Test multiple scenarios
