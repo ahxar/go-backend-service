@@ -35,9 +35,15 @@ func TestLoad_Defaults(t *testing.T) {
 func TestLoad_CustomValues(t *testing.T) {
 	clearEnv()
 
-	os.Setenv("PORT", "9000")
-	os.Setenv("LOG_LEVEL", "debug")
-	os.Setenv("ENVIRONMENT", "production")
+	if err := os.Setenv("PORT", "9000"); err != nil {
+		t.Fatalf("failed to set PORT: %v", err)
+	}
+	if err := os.Setenv("LOG_LEVEL", "debug"); err != nil {
+		t.Fatalf("failed to set LOG_LEVEL: %v", err)
+	}
+	if err := os.Setenv("ENVIRONMENT", "production"); err != nil {
+		t.Fatalf("failed to set ENVIRONMENT: %v", err)
+	}
 
 	defer clearEnv()
 
@@ -57,11 +63,11 @@ func TestLoad_CustomValues(t *testing.T) {
 }
 
 func clearEnv() {
-	os.Unsetenv("PORT")
-	os.Unsetenv("READ_TIMEOUT")
-	os.Unsetenv("WRITE_TIMEOUT")
-	os.Unsetenv("IDLE_TIMEOUT")
-	os.Unsetenv("SHUTDOWN_TIMEOUT")
-	os.Unsetenv("LOG_LEVEL")
-	os.Unsetenv("ENVIRONMENT")
+	_ = os.Unsetenv("PORT")
+	_ = os.Unsetenv("READ_TIMEOUT")
+	_ = os.Unsetenv("WRITE_TIMEOUT")
+	_ = os.Unsetenv("IDLE_TIMEOUT")
+	_ = os.Unsetenv("SHUTDOWN_TIMEOUT")
+	_ = os.Unsetenv("LOG_LEVEL")
+	_ = os.Unsetenv("ENVIRONMENT")
 }

@@ -54,7 +54,11 @@ func Setup(ctx context.Context, cfg Config, logger *slog.Logger) (func(context.C
 	// Setup metric provider
 	metricShutdown, err := setupMeterProvider(ctx, res, cfg.Endpoint, logger)
 	if err != nil {
-		traceShutdown(ctx)
+		if shutdownErr := traceShutdown(ctx); shutdownErr != nil {
+			logger.Error("failed to shutdown trace provider during cleanup",
+				slog.String("error", shutdownErr.Error()),
+			)
+		}
 		return nil, fmt.Errorf("failed to setup meter provider: %w", err)
 	}
 
